@@ -1,6 +1,6 @@
 # Offline RP Harness
 
-A role-play harness for low-parameter language models (1B–1.5B), designed to run **fully offline** on mid-range Android phones and low-end computers. No API calls, no server, no network dependency.
+A role-play harness for low-parameter language models (1B–1.5B), designed to run **fully offline** on mid-range Android phones and low-end computers. No API calls, no server, no network dependency. There will also be no monetization, telemetry, no analytics, no network calls and all logs and data stay on the device unless the user decides to export and share settings or logs. 
 
 **Current test target:** Nokia X20, 6 GB RAM, Snapdragon 480, Android 13.
 
