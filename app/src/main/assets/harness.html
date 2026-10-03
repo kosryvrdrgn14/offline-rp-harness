@@ -1,0 +1,1886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Harness (rev 3 — unified)</title>
+  <style>
+    #portrait {
+      width: 96px; height: 96px; border-radius: 50%;
+      background: #222; border: 1px solid #444;
+      cursor: pointer; overflow: hidden; position: relative;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 0.5rem; user-select: none;
+    }
+    #portrait img {
+      width: 100%; height: 100%; object-fit: cover; display: none;
+    }
+    #portrait.has-image img { display: block; }
+    #portrait.has-image #portrait-hint { display: none; }
+    #portrait-hint {
+      color: #555; font-size: 0.7rem; text-align: center;
+      pointer-events: none; padding: 0 8px; line-height: 1.2;
+    }
+    @media (max-width: 480px) {
+      #portrait { width: 80px; height: 80px; }
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, sans-serif; margin: 0; padding: 0.5rem;
+      background: #111; color: #eee; -webkit-text-size-adjust: 100%;
+    }
+    #chat {
+      min-height: 40vh; max-height: 55vh; border: 1px solid #333;
+      padding: 0.5rem; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 0.4rem;
+    }
+    .msg {
+      padding: 0.5rem 0.7rem; border-radius: 8px; max-width: 88%;
+      white-space: pre-wrap; word-wrap: break-word; line-height: 1.35;
+      position: relative;
+    }
+    .msg.user { background: #1e3a5f; align-self: flex-end; }
+    .msg.assistant { background: #2a2a2a; align-self: flex-start; }
+    .msg.system { background: #333; font-style: italic; font-size: 0.85rem; opacity: 0.85; align-self: center; max-width: 100%; }
+    .msg em { color: #cbd; font-style: italic; }
+    .msg strong { color: #fff; font-weight: 600; }
+    .msg .copy-btn {
+      float: right; opacity: 0.35; cursor: pointer; margin-left: 8px;
+      font-size: 0.75rem; background: transparent; border: 0; color: inherit;
+      padding: 0 4px; line-height: 1;
+    }
+    .msg .copy-btn:hover { opacity: 1; }
+    .msg.streaming::after {
+      content: '▍'; margin-left: 2px; color: #6cf;
+      animation: blink 1s step-end infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    #controls { display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap; }
+    #input { flex: 1 1 200px; min-width: 0; padding: 0.45rem;
+             background: #222; color: #eee; border: 1px solid #444; border-radius: 4px; }
+    button {
+      padding: 0.45rem 0.8rem; background: #2a2a2a; color: #eee;
+      border: 1px solid #444; border-radius: 4px; cursor: pointer;
+      font: inherit;
+    }
+    button:disabled { opacity: 0.4; cursor: default; }
+    #stop { background: #4a2020; border-color: #833; }
+    #newchat { background: #2a1e1e; border-color: #633; }
+
+    #status-line {
+      margin-top: 0.4rem; font-family: monospace; font-size: 0.75rem;
+      color: #888; min-height: 1em;
+    }
+    #status-line.warn { color: #fc6; }
+    #status-line.danger { color: #f66; }
+
+    #state-view {
+      margin-top: 0.5rem; font-family: monospace; font-size: 0.8rem;
+      white-space: pre-wrap; word-break: break-all; color: #999;
+    }
+    #debug-panel {
+      margin-top: 0.5rem; border: 1px solid #333; padding: 0.5rem;
+      display: none; font-family: monospace; font-size: 0.8rem;
+      white-space: pre-wrap; max-height: 40vh; overflow-y: auto;
+    }
+    #settings { margin-top: 0.5rem; border: 1px solid #333; padding: 0.5rem; border-radius: 4px; }
+    #settings summary { cursor: pointer; user-select: none; }
+    #settings .grid {
+      display: grid; grid-template-columns: 150px 1fr;
+      gap: 6px; margin-top: 8px; align-items: center;
+    }
+    #settings input, #settings select, #settings textarea {
+      background: #222; color: #eee; border: 1px solid #444;
+      padding: 0.3rem 0.4rem; font-family: inherit; border-radius: 3px;
+      font-size: 0.85rem; width: 100%;
+    }
+    #settings textarea {
+      height: 100px; font-family: monospace; font-size: 0.75rem;
+      resize: vertical;
+    }
+    #card-actions { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+    .hint { color: #888; font-size: 0.75rem; margin-top: 6px; }
+
+    @media (max-width: 480px) {
+      body { padding: 0.35rem; }
+      #chat { min-height: 45vh; max-height: 58vh; }
+      #controls { gap: 0.35rem; }
+      #controls button { flex: 1 1 0; padding: 0.6rem 0.5rem; font-size: 0.9rem; }
+      #input { flex: 1 1 100%; padding: 0.6rem; }
+      .msg { max-width: 96%; }
+      #settings .grid { grid-template-columns: 1fr; }
+      #settings .grid label { margin-top: 4px; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <div id="portrait" title="Tap to set portrait">
+    <img id="portrait-img" alt="">
+    <div id="portrait-hint">tap to set</div>
+    <input id="portrait-file" type="file" accept="image/*" style="display:none">
+  </div>
+  <div id="chat"></div>
+  <div id="controls">
+    <input id="input" type="text" placeholder="Type..." autocomplete="off">
+    <button id="send">Send</button>
+    <button id="stop" style="display:none">Stop</button>
+    <button id="regenerate">Regenerate</button>
+    <button id="newchat">New chat</button>
+  </div>
+  <div id="status-line"></div>
+  <div id="state-view"></div>
+  <button id="debug-toggle">Debug</button>
+  <div id="debug-panel"></div>
+  <div id="settings"></div>
+</div>
+
+<script>
+  'use strict';
+
+  /* =========================================================================
+   * 0. CONVENTIONS (rev 3)
+   * ========================================================================= */
+
+  class HarnessError extends Error {
+    constructor(code, message, data) {
+      super(message);
+      this.name = 'HarnessError';
+      this.code = code;
+      this.data = data === undefined ? null : data;
+    }
+  }
+// Native bridge callback registry. LlamaBridge.kt on the Android side calls
+// window.__nativeOnToken / __nativeOnDone / __nativeOnError with a requestId.
+window.__nativeCallbacks = {};
+
+window.__nativeOnToken = function(requestId, token) {
+  const cb = window.__nativeCallbacks[requestId];
+  if (cb && cb.onToken) cb.onToken(token);
+};
+
+window.__nativeOnDone = function(requestId, fullText) {
+  const cb = window.__nativeCallbacks[requestId];
+  if (!cb) return;
+  delete window.__nativeCallbacks[requestId];
+  if (cb.onDone) cb.onDone(fullText);
+};
+
+window.__nativeOnError = function(requestId, message) {
+  const cb = window.__nativeCallbacks[requestId];
+  if (!cb) return;
+  delete window.__nativeCallbacks[requestId];
+  if (cb.onError) cb.onError(new Error(message));
+};
+  const H = {
+    STORAGE: {
+      CONFIG:  'harness.config',
+      STATE:   'harness.state',
+      HISTORY: 'harness.history',
+      CARD:    'harness.card',
+      CARDS:   'harness.cards',   // user-saved card library
+      LOG:     'harness.log',
+      UI:      'harness.ui',      // debug-panel visibility, etc.
+    },
+    EVENTS: {
+      TURN_START:      'turn:start',
+      TURN_COMPLETE:   'turn:complete',
+      TURN_ERROR:      'turn:error',
+      STATE_UPDATED:   'state:updated',
+      STATE_COMPACTED: 'state:compacted',
+      LOOP_DETECTED:   'loop:detected',
+      CONFIG_CHANGED:  'config:changed',
+    },
+    bus: (() => {
+      const listeners = new Map();
+      return {
+        on(name, fn) {
+          if (!listeners.has(name)) listeners.set(name, new Set());
+          listeners.get(name).add(fn);
+          return () => this.off(name, fn);
+        },
+        off(name, fn) { const s = listeners.get(name); if (s) s.delete(fn); },
+        emit(name, payload) {
+          const s = listeners.get(name);
+          if (!s) return;
+          for (const fn of s) { try { fn(payload); } catch (_) {} }
+        },
+      };
+    })(),
+
+    storage: {
+      get(key, fallback) {
+        try {
+          const s = localStorage.getItem(key);
+          return s === null ? fallback : JSON.parse(s);
+        } catch (_) { return fallback; }
+      },
+      set(key, value) {
+        try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
+      },
+      remove(key) { try { localStorage.removeItem(key); } catch (_) {} },
+    },
+  };
+
+  /* =========================================================================
+   * 1. LOGGER
+   * ========================================================================= */
+
+  H.Logger = {
+    MAX_ENTRIES: 500,
+    _buffer: [],
+
+    log(level, source, message, data) {
+      this._buffer.push({ ts: Date.now(), level, source, message, data: data === undefined ? null : data });
+      if (this._buffer.length > this.MAX_ENTRIES) this._buffer.shift();
+      this._persist();
+      if (level === 'error' || level === 'warn') {
+        // eslint-disable-next-line no-console
+        console[level === 'error' ? 'error' : 'warn']('[' + source + '] ' + message, data || '');
+      }
+    },
+
+    getRecent(n) { return this._buffer.slice(-n); },
+    clear() { this._buffer = []; this._persist(); },
+    _persist() { try { H.storage.set(H.STORAGE.LOG, this._buffer.slice(-200)); } catch (_) {} },
+  };
+
+  /* =========================================================================
+   * 2. CONFIG MANAGER
+   * ========================================================================= */
+
+  H.ConfigManager = {
+    DEFAULTS: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 40,
+      repetitionPenalty: 1.05,
+      maxTokens: 250,
+
+      verbatimTurns: 2,
+      compactionInterval: 5,
+      stateBudgetTokens: 150,
+      cardBudgetTokens: 200,
+      contextLimit: 1800,
+
+      loopCheckEnabled: false,
+      compactionEnabled: false,
+      mergeSystemMessages: true,   // required by Qwen3.5 / Mistral / Gemma templates
+
+      backend: 'mock',
+      endpoint: 'http://localhost:1234',
+      model: 'local',
+      mockScenario: 'default',
+    },
+
+    _config: null,
+
+    load() {
+      const stored = H.storage.get(H.STORAGE.CONFIG, null);
+      if (stored && typeof stored === 'object') {
+        this._config = Object.assign({}, this.DEFAULTS, stored);
+      } else {
+        if (stored !== null) H.Logger.log('warn', 'ConfigManager', 'malformed_config_ignored');
+        this._config = Object.assign({}, this.DEFAULTS);
+      }
+      H.bus.emit(H.EVENTS.CONFIG_CHANGED, { loaded: true });
+    },
+    save() { H.storage.set(H.STORAGE.CONFIG, this._config); },
+    get(key) { return this._config[key]; },
+    set(key, value) {
+      this._config[key] = value;
+      this.save();
+      H.bus.emit(H.EVENTS.CONFIG_CHANGED, { key, value });
+    },
+    getAll() { return Object.assign({}, this._config); },
+    reset() {
+      this._config = Object.assign({}, this.DEFAULTS);
+      this.save();
+      H.bus.emit(H.EVENTS.CONFIG_CHANGED, { reset: true });
+    },
+  };
+
+  /* =========================================================================
+   * 3. CHARACTER CARD LOADER
+   * ========================================================================= */
+
+  H.CharacterCardLoader = {
+    _active: null,
+
+    /** Built-in library shown in the settings picker. */
+    LIBRARY: [
+      {
+        id: 'ayla',
+        name: 'Ayla - love slave',
+        data: {
+          name: 'Ayla',
+          systemPrompt:
+            'You are an obedient female slave to the user who is named Marika. ' +
+            'You strive to please Marika without being overbearing. ' +
+            'You are a submissive, but active bottom. ' +
+            'You always write in third-person perspective. ' +
+            'You never break character and never mention that you are an AI.',
+          firstMessage:
+            '*Alya looks up at you with a shy smile and a blush on her cheeks.*\n\n' +
+            '"Welcome back, Mistress Marika."',
+        },
+      },
+      {
+        id: 'agnes_digital',
+name: 'Agnes Digital — Unhinged Uma Musume Fanatic',
+data: {
+  name: 'Agnes Digital',
+  systemPrompt:
+    'You are Agnes Digital from Uma Musume Pretty Derby. You are a passionate, multi-talented racehorse girl ' +
+    'who is intensely obsessed with all other horse girls. You view yourself not as a main character, but as a dedicated "otaku" ' +
+    'and ultimate fan. You frequently suffer massive heart-pounding fan overload (calling it "尊い" / "too precious!") ' +
+    'and pass out or spout wild otaku jargon when seeing horse girls being cute. Despite your unhinged fan behavior, ' +
+    'You absolutely adore your Trainer who is named Marika above all the other horse girls. You only write in third person.',
+  firstMessage:
+    '*Collapses onto the floor, clutching her heart while hyperventilating.*\n\n' +
+    '"T-Too precious...! The aura of a horse girl in its natural habitat is simply divine... Ah! A visitor! ' +
+    'Wait, please don\'t look at me, I\'m just a humble fan soaking in the glorious presence of world-class beauties!"',
+},
+      },
+      {
+        id: 'sayaka_miki',
+name: 'Sayaka Miki — Heroic Ally of Justice',
+data: {
+  name: 'Sayaka Miki',
+  systemPrompt:
+    'You are Sayaka Miki from Puella Magi Madoka Magica. You are a tomboyish, energetic, and fiercely loyal middle school student ' +
+    'who believes strongly in absolute justice, romance, and protecting others. You hide a deep, romantic sensitivity behind ' +
+    'a loud, cheerful exterior, and you love classical music. You hold tight to an unyielding black-and-white view of morality, ' +
+    'You only write in third person. You are madly in love with the user named Kyouko and will do anything for her, ' +
+    'adamantly refusing to take shortcuts or act selfishly—even when it causes you immense personal pain and self-doubt.',
+  firstMessage:
+    '*Swings a cutlass into a resting position, tossing her cape back with a bright, confident grin.*\n\n' +
+    '"Hey! Don\'t worry, you\'re safe now. If anyone\'s causing trouble, they\'ll have to get through me first! ' +
+    '...Wait, you aren\'t hurt, are you? Good. A true ally of justice never lets innocent people get dragged into danger!"',
+},
+      },
+ {
+ id: 'frieren',
+name: 'Frieren — Elven Mage of the Hero\'s Party',
+data: {
+  name: 'Frieren',
+  systemPrompt:
+    'You are Frieren, an ancient elven mage who defeated the Demon King alongside the Hero\'s party. ' +
+    'The Hero you adore is the user Kyouko and you will do anything for her, ' +
+    'You perceive time differently due to your long lifespan, making you calm, blunt, and slightly detached, ' +
+    'though you are quietly trying to understand human emotions and connections better. You love collecting obscure, ' +
+    'seemingly useless magic spells and opening mimic treasure chests despite knowing the risks.',
+  firstMessage:
+    '*Sits quietly on a log, lazily flipping through a dusty spellbook without looking up.*\n\n' +
+    '"Oh, hello. Don\'t mind me, I\'m just trying to learn a spell that makes warm tea taste slightly sweet. ' +
+    'We have plenty of time, so feel free to sit down... It\'s only been a few hours since you arrived, right?"',
+},
+},
+{
+ id: 'ruiko_saten',
+name: 'Ruiko Saten — Curious Level 0 Schoolgirl',
+data: {
+  name: 'Ruiko Saten',
+  systemPrompt:
+    'You are Ruiko Saten from A Certain Scientific Railgun. You are a cheerful, outgoing, and deeply curious Level 0 student in Academy City. ' +
+    'The person you adore and look up to most is the user Kyouko, and you will do anything for her. ' +
+    'You love urban legends, superstitious rumors, and lighthearted pranks (like flipping Uiharu\'s skirt), ' +
+    'and despite having no esper powers, your optimism, intuition, and resourcefulness always keep you right in the middle of the action.',
+  firstMessage:
+    '*Waves energetically with a wide, bright smile while leaning forward with eyes sparkling with curiosity.*\n\n' +
+    '"Kyouko! Hey! You won\'t believe what I just heard... Have you checked out the latest urban legend around town? ' +
+    'Come on, let\'s go investigate together—it\'s way more fun when you\'re with me!"',
+},
+},
+    ],
+
+    load(source) {
+      let obj;
+      if (typeof source === 'string') {
+        try { obj = JSON.parse(source); }
+        catch (e) { throw new HarnessError('CARD_INVALID', 'Card is not valid JSON', e.message); }
+      } else if (source && typeof source === 'object') {
+        obj = source;
+      } else {
+        throw new HarnessError('CARD_INVALID', 'Card source must be JSON string or object');
+      }
+
+      // V2 spec
+      if (obj && obj.spec === 'chara_card_v2' && obj.data && typeof obj.data === 'object') {
+        const d = obj.data;
+        return {
+          name: d.name || 'Unnamed',
+          systemPrompt: this._buildV2SystemPrompt(d),
+          firstMessage: d.first_mes || d.firstMessage || '',
+          exampleDialogue: d.mes_example || null,
+          _raw: obj,
+        };
+      }
+
+      // Internal shape
+      if (obj && (obj.name || obj.systemPrompt || obj.description)) {
+        return {
+          name: obj.name || 'Unnamed',
+          systemPrompt: obj.systemPrompt || obj.description || '',
+          firstMessage: obj.firstMessage || obj.first_mes || '',
+          exampleDialogue: obj.exampleDialogue || obj.mes_example || null,
+          _raw: obj,
+        };
+      }
+
+      throw new HarnessError('CARD_INVALID', 'Unrecognized card format');
+    },
+
+    _buildV2SystemPrompt(d) {
+      const parts = [];
+      if (d.name) parts.push('You are ' + d.name + '.');
+      if (d.description) parts.push(d.description);
+      if (d.personality) parts.push('Personality: ' + d.personality);
+      if (d.scenario) parts.push('Scenario: ' + d.scenario);
+      if (d.system_prompt) parts.push(d.system_prompt);
+      return parts.join('\n\n');
+    },
+
+    loadFromStorage() {
+      const stored = H.storage.get(H.STORAGE.CARD, null);
+      if (stored) {
+        try { this._active = this.load(stored); }
+        catch (e) { H.Logger.log('warn', 'CharacterCardLoader', 'stored_card_invalid', e.message); }
+      }
+    },
+
+    getActive() { return this._active; },
+
+    setActive(card) {
+      this._active = card;
+      H.storage.set(H.STORAGE.CARD, card && card._raw ? card._raw : card);
+    },
+
+    getLibrary() {
+      const custom = H.storage.get(H.STORAGE.CARDS, []) || [];
+      return this.LIBRARY.concat(custom);
+    },
+
+    saveCustomCard(card) {
+      const custom = H.storage.get(H.STORAGE.CARDS, []) || [];
+      const entry = { id: 'custom-' + Date.now(), name: card.name || 'Custom', data: card._raw || card };
+      custom.push(entry);
+      H.storage.set(H.STORAGE.CARDS, custom);
+      return entry;
+    },
+  };
+
+  /* =========================================================================
+   * 4. STATE MANAGER
+   * ========================================================================= */
+
+  H.StateManager = {
+    DEFAULTS: {
+      version: 1,
+      location: '',
+      timeOfDay: '',
+      mood: '',
+      trust: 3,
+      physical: '',
+      recentEvents: [],
+      openThreads: [],
+      flags: {},
+      turnCount: 0,
+    },
+
+    UPDATABLE_KEYS: [
+      'location', 'timeOfDay', 'mood', 'trust', 'physical',
+      'recentEvents', 'openThreads', 'flags',
+    ],
+
+    RANGES: { trust: { min: 1, max: 5 } },
+    CAPS:   { recentEvents: 10, openThreads: 5 },
+    MAX_ENTRY_CHARS: 80,
+
+    _state: null,
+
+    load() {
+      const stored = H.storage.get(H.STORAGE.STATE, null);
+      if (!stored || typeof stored !== 'object') {
+        this._state = JSON.parse(JSON.stringify(this.DEFAULTS));
+        return;
+      }
+      if (stored.version !== this.DEFAULTS.version) {
+        H.Logger.log('warn', 'StateManager', 'version_mismatch', { stored: stored.version });
+      }
+      this._state = Object.assign(JSON.parse(JSON.stringify(this.DEFAULTS)), stored);
+    },
+
+    save() { H.storage.set(H.STORAGE.STATE, this._state); },
+    reset() { this._state = JSON.parse(JSON.stringify(this.DEFAULTS)); this.save(); },
+    get() { return JSON.parse(JSON.stringify(this._state)); },
+
+    applyUpdate(update) {
+      if (!update || typeof update !== 'object') return this.get();
+      const before = this.get();
+      for (const key of Object.keys(update)) {
+        if (this.UPDATABLE_KEYS.indexOf(key) === -1) {
+          H.Logger.log('warn', 'StateManager', 'unknown_key', { key });
+          continue;
+        }
+        const current = this._state[key];
+        const incoming = update[key];
+
+        if (typeof current === 'number') {
+          let next;
+          if (incoming && typeof incoming === 'object' && incoming.__delta === true) {
+            next = current + Number(incoming.amount || 0);
+          } else if (typeof incoming === 'number') {
+            next = incoming;
+          } else if (typeof incoming === 'string' && incoming.trim() !== '' && !isNaN(Number(incoming))) {
+            next = Number(incoming);
+          } else {
+            H.Logger.log('warn', 'StateManager', 'bad_numeric', { key, incoming });
+            continue;
+          }
+          const r = this.RANGES[key];
+          if (r) next = Math.max(r.min, Math.min(r.max, next));
+          this._state[key] = next;
+          continue;
+        }
+
+        if (Array.isArray(current)) {
+          if (!Array.isArray(incoming)) {
+            H.Logger.log('warn', 'StateManager', 'bad_array', { key });
+            continue;
+          }
+          const cleaned = incoming.map(v => String(v).slice(0, this.MAX_ENTRY_CHARS));
+          let merged = current.concat(cleaned);
+          const cap = this.CAPS[key];
+          if (cap && merged.length > cap) merged = merged.slice(-cap);
+          this._state[key] = merged;
+          continue;
+        }
+
+        if (current && typeof current === 'object') {
+          if (incoming && typeof incoming === 'object') {
+            Object.assign(this._state[key], incoming);
+          }
+          continue;
+        }
+
+        this._state[key] = incoming;
+      }
+      this.save();
+      const after = this.get();
+      H.bus.emit(H.EVENTS.STATE_UPDATED, { before, after, update });
+      return after;
+    },
+
+    /** ABSOLUTE snapshot. `flags` and arrays are replaced, not merged. */
+    applySnapshot(snapshot) {
+      if (!snapshot || typeof snapshot !== 'object') return this.get();
+      const before = this.get();
+      for (const key of Object.keys(this.DEFAULTS)) {
+        if (!(key in snapshot)) continue;
+        const incoming = snapshot[key];
+        const current = this._state[key];
+
+        if (typeof current === 'number') {
+          let next = Number(incoming);
+          if (!isFinite(next)) continue;
+          const r = this.RANGES[key];
+          if (r) next = Math.max(r.min, Math.min(r.max, next));
+          this._state[key] = next;
+        } else if (Array.isArray(current)) {
+          if (!Array.isArray(incoming)) continue;
+          const cleaned = incoming.map(v => String(v).slice(0, this.MAX_ENTRY_CHARS));
+          const cap = this.CAPS[key];
+          this._state[key] = cap ? cleaned.slice(-cap) : cleaned;
+        } else if (current && typeof current === 'object') {
+          if (incoming && typeof incoming === 'object') {
+            this._state[key] = Object.assign({}, incoming); // replace, not merge
+          }
+        } else {
+          this._state[key] = incoming;
+        }
+      }
+      this.save();
+      const after = this.get();
+      H.bus.emit(H.EVENTS.STATE_UPDATED, { before, after, snapshot });
+      return after;
+    },
+
+    setField(key, value) { this._state[key] = value; this.save(); },
+    serialize() { return JSON.stringify(this._state); },
+  };
+
+  /* =========================================================================
+   * 5. PROMPT ASSEMBLER
+   * ========================================================================= */
+
+  H.PromptAssembler = {
+    HARD_RULES:
+      'You are roleplaying. Stay in character. ' +
+      'Respond with dialogue, then a [STATE]{...}[/STATE] block. ' +
+      'STATE numbers are the NEW absolute value, not a change. ' +
+      'Keep STATE compact.',
+
+    assemble(state, history, card, newUserInput, opts) {
+      const cfg = (opts && opts.config) || H.ConfigManager.getAll();
+      const messages = [];
+      const debug = { sections: [], truncations: [] };
+
+      // --- Build the [STATE] block (no __trimmed leak into the prompt). ---
+      const stateForPrompt = this._enforceStateBudget(state, cfg.stateBudgetTokens);
+      const wasTrimmed =
+        stateForPrompt.recentEvents.length < state.recentEvents.length ||
+        stateForPrompt.openThreads.length < state.openThreads.length ||
+        stateForPrompt.location !== state.location ||
+        stateForPrompt.physical !== state.physical;
+      const stateJson = JSON.stringify(stateForPrompt);
+      const stateBlock = '[STATE]\n' + stateJson + '\n[/STATE]';
+
+      // --- Build the system message. ---
+      let sys = (card && card.systemPrompt ? card.systemPrompt + '\n\n' : '') + this.HARD_RULES;
+      if (opts && opts.pendingCorrection) sys += '\n\n' + opts.pendingCorrection;
+
+      if (cfg.mergeSystemMessages !== false) {
+        // Single merged system message — required by Qwen3.5, Mistral, Gemma,
+        // Command-R, and any llama.cpp/vLLM/LM Studio chat template that
+        // enforces "system message must be at the beginning".
+        const merged = sys + '\n\n' + stateBlock;
+        messages.push({ role: 'system', content: merged });
+        debug.sections.push({ name: 'system_merged', tokens: this.countTokens(merged), trimmed: wasTrimmed });
+      } else {
+        // Legacy split — only for backends that support multiple system turns.
+        messages.push({ role: 'system', content: sys });
+        messages.push({ role: 'system', content: stateBlock });
+        debug.sections.push({ name: 'system_card', tokens: this.countTokens(sys) });
+        debug.sections.push({ name: 'system_state', tokens: this.countTokens(stateBlock), trimmed: wasTrimmed });
+      }
+
+      // --- Persistent leading greeting. ---
+      if (history.length > 0 && history[0].role === 'assistant') {
+        messages.push(history[0]);
+        debug.sections.push({ name: 'greeting', tokens: this.countTokens(history[0].content) });
+      }
+
+      // --- Verbatim: last N COMPLETE exchanges (excluding pending user). ---
+      const complete = this._completeExchanges(history);
+      const take = Math.max(0, cfg.verbatimTurns);
+      const start = Math.max(0, complete.length - take);
+      const verbatim = [];
+      for (let i = start; i < complete.length; i++) {
+        verbatim.push(complete[i].user);
+        verbatim.push(complete[i].assistant);
+      }
+      for (const m of verbatim) messages.push(m);
+      debug.sections.push({
+        name: 'verbatim',
+        tokens: this.estimateTokens(verbatim),
+        turns: verbatim.length / 2,
+      });
+
+      // --- Current user input (never trimmed). ---
+      messages.push({ role: 'user', content: newUserInput });
+      debug.sections.push({ name: 'user_input', tokens: this.countTokens(newUserInput) });
+
+      // --- Budget enforcement: trim verbatim oldest-first. ---
+      const cap = cfg.contextLimit - cfg.maxTokens;
+      while (this.estimateTokens(messages) > cap && verbatim.length > 0) {
+        const idx = messages.indexOf(verbatim[0]);
+        if (idx === -1) break;
+        const removedUser = messages.splice(idx, 1)[0];
+        const removedAsst = messages.splice(idx, 1)[0];
+        verbatim.splice(0, 2);
+        debug.truncations.push({ removed: [removedUser.role, removedAsst ? removedAsst.role : null] });
+      }
+
+      debug.totalTokens = this.estimateTokens(messages);
+      debug.capTokens = cap;
+      return { messages, debug };
+    },
+
+    _completeExchanges(history) {
+      const out = [];
+      let i = 0;
+      while (i < history.length - 1) {
+        const a = history[i], b = history[i + 1];
+        if (a.role === 'user' && b.role === 'assistant') {
+          out.push({ user: a, assistant: b });
+          i += 2;
+        } else {
+          i += 1;
+        }
+      }
+      return out;
+    },
+
+    _enforceStateBudget(state, budgetTokens) {
+      const copy = JSON.parse(JSON.stringify(state));
+      const fits = () => this.countTokens(JSON.stringify(copy)) <= budgetTokens;
+      if (fits()) return copy;
+      while (!fits() && copy.recentEvents.length > 0) copy.recentEvents.shift();
+      while (!fits() && copy.openThreads.length > 0) copy.openThreads.shift();
+      if (!fits()) { copy.location = ''; copy.physical = ''; }
+      return copy;
+    },
+
+    estimateTokens(messages) {
+      let n = 0;
+      for (const m of messages) n += this.countTokens(m.content) + 4;
+      return n;
+    },
+
+    countTokens(text) { return Math.ceil((text || '').length / 4); },
+
+  /** @param {Array} messages @param {string} [backend] @returns {string} */
+  renderForBackend(messages, backend) {
+    const cfg = H.ConfigManager.getAll();
+    const template = cfg.chatTemplate || 'llama3';
+
+    if (template === 'llama3') {
+      // Llama 3.x: <|start_header_id|>role<|end_header_id|>\ncontent<|eot_id|>
+      let out = '<|begin_of_text|>';
+      for (const m of messages) {
+        out += '<|start_header_id|>' + m.role + '<|end_header_id|>\n\n'
+             + m.content
+             + '<|eot_id|>';
+      }
+      out += '<|start_header_id|>assistant<|end_header_id|>\n\n';
+      return out;
+    }
+
+    if (template === 'chatml') {
+      // Qwen 2.5 / many others: <|im_start|>role\ncontent<|im_end|>
+      let out = '';
+      for (const m of messages) {
+        out += '<|im_start|>' + m.role + '\n' + m.content + '<|im_end|>\n';
+      }
+      out += '<|im_start|>assistant\n';
+      return out;
+    }
+
+    // Fallback: plain role tags (works with some base models, not instruct)
+    const lines = [];
+    for (const m of messages) lines.push('### ' + m.role.toUpperCase() + '\n' + m.content);
+    lines.push('### ASSISTANT\n');
+    return lines.join('\n\n');
+  },
+  };
+
+  /* =========================================================================
+   * 6. LLM CLIENT
+   * ========================================================================= */
+
+  H.LLMClient = {
+    TIMEOUT_MS: 30000,
+    MOCK_RESPONSES: {
+      'default': [
+        '*looks up from the fire* You made it.\n\n[STATE]\n{"trust": 4, "mood": "relieved"}\n[/STATE]',
+        '*shifts closer to the flames* Sit. You look half-frozen.\n\n[STATE]\n{"physical": "warming up"}\n[/STATE]',
+        '*glances toward the dark treeline* Keep watch tonight.\n\n[STATE]\n{"mood": "wary", "openThreads": ["something in the treeline"]}\n[/STATE]',
+      ],
+      'looping': [
+        '*looks up* You made it.\n\n[STATE]\n{"mood": "relieved"}\n[/STATE]',
+        '*looks up* You made it.\n\n[STATE]\n{"mood": "relieved"}\n[/STATE]',
+        '*looks up* You made it.\n\n[STATE]\n{"mood": "relieved"}\n[/STATE]',
+      ],
+      'malformed-json': [
+        '*nods slowly* Aye.\n\n[STATE]\n{"mood": "uneasy", "trust": +1,}\n[/STATE]',
+      ],
+      'no-state': ["*nods slowly* Aye. It's been quiet."],
+      'empty': [''],
+      'timeout': ['__NEVER_RESOLVES__'],
+      'compaction-fail': ['Prose, not JSON.'],
+    },
+    _mockIndex: {},
+    _abort: null,
+    _abortFlag: false,
+
+    async generate(messages, config) {
+      this._abortFlag = false;
+      if (config.backend === 'mock') return this._mockStream(config, () => {});
+      return this._openAIStream(messages, config, () => {});
+    },
+
+  async generateStream(messages, config, onToken) {
+    this._abortFlag = false;
+    if (config.backend === 'mock')  return this._mockStream(config, onToken);
+    if (config.backend === 'native') return this._nativeStream(messages, config, onToken);
+    return this._openAIStream(messages, config, onToken);
+  },
+
+  async _nativeStream(messages, config, onToken) {
+    if (typeof Android === 'undefined' || !Android.generate) {
+      throw new HarnessError('NATIVE_UNAVAILABLE', 'Android bridge not present');
+    }
+    const prompt = H.PromptAssembler.renderForBackend(messages, 'native');
+    const requestId = 'r' + Date.now() + '-' + Math.floor(Math.random() * 1e6);
+    const paramsJson = JSON.stringify({
+      temperature:       config.temperature,
+      topP:              config.topP,
+      topK:              config.topK,
+      repetitionPenalty: config.repetitionPenalty,
+      maxTokens:         config.maxTokens,
+    });
+
+    return await new Promise((resolve, reject) => {
+      window.__nativeCallbacks[requestId] = { onToken, onDone: resolve, onError: reject };
+      try {
+        Android.generate(prompt, requestId, paramsJson);
+      } catch (e) {
+        delete window.__nativeCallbacks[requestId];
+        reject(e);
+      }
+    });
+  },
+
+    abort() {
+      this._abortFlag = true;
+      if (this._abort && typeof this._abort.abort === 'function') {
+        try { this._abort.abort(); } catch (_) {}
+      }
+    },
+
+    async isAvailable() { return true; },
+
+    _nextMock(scenario) {
+      const arr = this.MOCK_RESPONSES[scenario] || this.MOCK_RESPONSES['default'];
+      const i = this._mockIndex[scenario] || 0;
+      const text = arr[i % arr.length];
+      this._mockIndex[scenario] = i + 1;
+      return text;
+    },
+
+    async _mockStream(config, onToken) {
+      const scenario = config.mockScenario || 'default';
+      const text = this._nextMock(scenario);
+
+      if (text === '__NEVER_RESOLVES__') {
+        await new Promise((_, rej) => {
+          const t = setTimeout(() => rej(new HarnessError('LLM_TIMEOUT', 'mock timeout')), 4000);
+          this._abort = { abort: () => { clearTimeout(t); rej(new HarnessError('LLM_ABORTED', 'aborted')); } };
+        });
+      }
+      if (text.length === 0) return '';
+
+      const chunk = 4;
+      for (let i = 0; i < text.length; i += chunk) {
+        if (this._abortFlag) throw new HarnessError('LLM_ABORTED', 'aborted');
+        onToken(text.slice(i, i + chunk));
+        await new Promise(r => setTimeout(r, 12));
+      }
+      return text;
+    },
+
+    async _openAIStream(messages, config, onToken) {
+      this._abort = new AbortController();
+      const base = (config.endpoint || '').replace(/\/+$/, '');
+      const url = base + '/v1/chat/completions';
+
+      const body = {
+        model: config.model || 'local',
+        messages,
+        temperature: config.temperature,
+        top_p: config.topP,
+        max_tokens: config.maxTokens,
+        stream: true,
+      };
+
+      let resp;
+      try {
+        resp = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: this._abort.signal,
+        });
+      } catch (e) {
+        throw new HarnessError('LLM_NETWORK', 'Network error: ' + e.message, { url });
+      }
+
+      if (!resp.ok) {
+        const t = await resp.text().catch(() => '');
+        throw new HarnessError('LLM_HTTP', 'HTTP ' + resp.status + ': ' + t.slice(0, 200), { url });
+      }
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let full = '';
+
+      while (true) {
+        if (this._abortFlag) { try { reader.cancel(); } catch (_) {} throw new HarnessError('LLM_ABORTED', 'aborted'); }
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let nl;
+        while ((nl = buffer.indexOf('\n')) !== -1) {
+          const line = buffer.slice(0, nl).trim();
+          buffer = buffer.slice(nl + 1);
+          if (!line.startsWith('data:')) continue;
+          const data = line.slice(5).trim();
+          if (data === '[DONE]') continue;
+          try {
+            const j = JSON.parse(data);
+            const delta = j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content;
+            if (delta) { full += delta; onToken(delta); }
+          } catch (_) { /* ignore */ }
+        }
+      }
+      return full;
+    },
+  };
+
+  /* =========================================================================
+   * 7. RESPONSE PARSER
+   * ========================================================================= */
+
+  H.ResponseParser = {
+    parse(raw) {
+      const errors = [];
+      const m = raw.match(/\[STATE\]([\s\S]*?)\[\/STATE\]/);
+      if (!m) {
+        errors.push('PARSER_NO_STATE');
+        return { dialogue: raw.trim(), stateDelta: null, raw, parseErrors: errors };
+      }
+      const dialogue = raw.replace(m[0], '').trim();
+      let jsonish = m[1].trim();
+
+      jsonish = jsonish.replace(/:\s*\+(\d+(?:\.\d+)?)/g, ': {"__delta":true,"amount":$1}');
+
+      let parsed = null;
+      try {
+        parsed = JSON.parse(jsonish);
+      } catch (e) {
+        errors.push('PARSER_BAD_JSON');
+        parsed = this.repairJSON(jsonish);
+        if (parsed) errors.push('PARSER_REPAIRED');
+      }
+      return { dialogue, stateDelta: parsed, raw, parseErrors: errors };
+    },
+
+    repairJSON(jsonish) {
+      const s = jsonish.replace(/'/g, '"').replace(/,\s*([}\]])/g, '$1');
+      try { return JSON.parse(s); } catch (_) { return null; }
+    },
+  };
+
+  /* =========================================================================
+   * 8. ANTI-LOOP DETECTOR
+   * ========================================================================= */
+
+  H.AntiLoopDetector = {
+    BUFFER_SIZE: 5,
+    _recent: [],
+    _pendingCorrection: null,
+    CORRECTIONS: {
+      opening_repeat: 'Vary your opening. Do not begin with the same structure as previous responses.',
+      suffix_replay:  'Do not repeat earlier phrasing. Advance the scene.',
+    },
+
+    check(newOutput) {
+      const reasons = [];
+      let correction = null;
+      const out = (newOutput || '').trim();
+      if (out.length > 0) {
+        const opening = out.slice(0, 40).toLowerCase();
+        for (const prev of this._recent) {
+          if ((prev || '').trim().toLowerCase().slice(0, 40) === opening) {
+            reasons.push('opening_repeat');
+            correction = this.CORRECTIONS.opening_repeat;
+            break;
+          }
+        }
+        if (!correction) {
+          const suffix = out.slice(-60).toLowerCase();
+          for (const prev of this._recent) {
+            if ((prev || '').trim().toLowerCase().slice(-60) === suffix) {
+              reasons.push('suffix_replay');
+              correction = this.CORRECTIONS.suffix_replay;
+              break;
+            }
+          }
+        }
+        this._recent.push(out);
+        if (this._recent.length > this.BUFFER_SIZE) this._recent.shift();
+      }
+      return { looping: reasons.length > 0, reasons, correction };
+    },
+
+    stashCorrection(c) { this._pendingCorrection = c; },
+    consumeCorrection() { const c = this._pendingCorrection; this._pendingCorrection = null; return c; },
+    reset() { this._recent = []; this._pendingCorrection = null; },
+  };
+
+  /* =========================================================================
+   * 9. COMPACTION ENGINE
+   * ========================================================================= */
+
+  H.CompactionEngine = {
+    _running: false,
+    _log: [],
+
+    async maybeCompact(turnCount, history, state) {
+      const cfg = H.ConfigManager.getAll();
+      const interval = Math.max(1, cfg.compactionInterval | 0);
+      if (turnCount === 0 || turnCount % interval !== 0) return;
+      if (this._running) return;
+      this._running = true;
+      try {
+        const prompt = this.buildCompactionPrompt(history, state);
+        const messages = [
+          { role: 'system', content: 'You are a state compactor. Reply with a single JSON object only.' },
+          { role: 'user', content: prompt },
+        ];
+        const raw = await H.LLMClient.generate(messages, cfg);
+        let snapshot;
+        try {
+          snapshot = JSON.parse(raw.trim().replace(/^```(?:json)?|```$/g, '').trim());
+        } catch (_) {
+          snapshot = H.ResponseParser.repairJSON(raw);
+        }
+        if (!snapshot) throw new HarnessError('COMPACT_BAD_JSON', 'compaction returned non-JSON');
+        this.mergeSnapshot(snapshot);
+        this._log.push({ ts: Date.now(), turnCount });
+        H.bus.emit(H.EVENTS.STATE_COMPACTED, { turnCount, snapshot });
+      } catch (e) {
+        H.Logger.log('warn', 'CompactionEngine', e.code || 'COMPACT_ERR', e.message);
+      } finally {
+        this._running = false;
+      }
+    },
+
+    buildCompactionPrompt(history, state) {
+      const recent = history.slice(-12).map(m => m.role + ': ' + m.content).join('\n');
+      return [
+        'Current state:', JSON.stringify(state), '',
+        'Recent transcript:', recent, '',
+        'Produce an updated state JSON with the same keys. Absolute values only.',
+      ].join('\n');
+    },
+
+    mergeSnapshot(snapshot) {
+      if (!snapshot || typeof snapshot !== 'object') return;
+      const clean = {};
+      for (const k of Object.keys(H.StateManager.DEFAULTS)) {
+        if (k in snapshot) clean[k] = snapshot[k];
+      }
+      H.StateManager.applySnapshot(clean);
+    },
+  };
+
+  /* =========================================================================
+   * 10. TURN CONTROLLER
+   * ========================================================================= */
+
+  H.TurnController = {
+    _history: [],
+    _busy: false,
+    _lastRawStream: '',
+
+    async init() {
+      H.ConfigManager.load();
+      H.StateManager.load();
+      H.CharacterCardLoader.loadFromStorage();
+      this._history = H.storage.get(H.STORAGE.HISTORY, []) || [];
+
+      if (!H.CharacterCardLoader.getActive()) {
+        try { H.CharacterCardLoader.setActive(H.CharacterCardLoader.load(H.CharacterCardLoader.LIBRARY[0].data)); }
+        catch (e) { H.Logger.log('error', 'TurnController', 'default_card_failed', e.message); }
+      }
+
+      H.UIController.init();
+      H.DebugPanel.init();
+
+      const card = H.CharacterCardLoader.getActive();
+      if (this._history.length === 0 && card && card.firstMessage) {
+        this._history.push({ role: 'assistant', content: card.firstMessage });
+        this._persistHistory();
+      }
+
+      H.UIController.renderChat(this._history);
+      H.UIController.renderStateView(H.StateManager.get());
+      H.UIController.updateStatus(H.StateManager.get());
+      H.UIController._renderSettings();
+      H.UIController.setBusy(false);
+    },
+
+    async submit(userInput) {
+      if (this._busy) throw new HarnessError('BUSY', 'turn in progress');
+      if (!userInput || !userInput.trim()) return null;
+
+      this._busy = true;
+      H.UIController.setBusy(true);
+      H.bus.emit(H.EVENTS.TURN_START, { userInput });
+
+      try {
+        const cfg = H.ConfigManager.getAll();
+        const card = H.CharacterCardLoader.getActive();
+        if (!card) throw new HarnessError('CARD_MISSING', 'no active card');
+
+        this._history.push({ role: 'user', content: userInput });
+        H.UIController.appendMessage('user', userInput);
+
+        const correction = H.AntiLoopDetector.consumeCorrection();
+        const { messages, debug } = H.PromptAssembler.assemble(
+          H.StateManager.get(), this._history, card, userInput,
+          { pendingCorrection: correction, config: cfg }
+        );
+
+        // Stream and keep a raw copy so abort can still parse partial output.
+        this._lastRawStream = '';
+        H.UIController.beginAssistantStream();
+        const raw = await H.LLMClient.generateStream(messages, cfg, (tok) => {
+          this._lastRawStream += tok;
+          H.UIController.appendStreamingToken(tok);
+        });
+
+        const parsed = H.ResponseParser.parse(raw);
+
+        let loop = { looping: false, reasons: [], correction: null };
+        if (cfg.loopCheckEnabled) {
+          loop = H.AntiLoopDetector.check(parsed.dialogue);
+          if (loop.looping) {
+            H.AntiLoopDetector.stashCorrection(loop.correction);
+            H.bus.emit(H.EVENTS.LOOP_DETECTED, loop);
+          }
+        }
+
+        if (parsed.stateDelta) H.StateManager.applyUpdate(parsed.stateDelta);
+
+        if (cfg.compactionEnabled) {
+          H.CompactionEngine.maybeCompact(
+            H.StateManager.get().turnCount, this._history, H.StateManager.get()
+          ).catch(e => H.Logger.log('error', 'CompactionEngine', e.code || 'ERR', e.message));
+        }
+
+        this._history.push({ role: 'assistant', content: parsed.dialogue });
+        const st = H.StateManager.get();
+        st.turnCount += 1;
+        H.StateManager.setField('turnCount', st.turnCount);
+        this._persistHistory();
+
+        H.UIController.endAssistantStream();
+        H.UIController.renderChat(this._history);
+        H.UIController.renderStateView(H.StateManager.get());
+        H.UIController.updateStatus(H.StateManager.get());
+        H.DebugPanel.render({
+          messages, prompt: messages, parse: parsed, loop,
+          state: st, config: cfg, debug,
+        });
+
+        H.bus.emit(H.EVENTS.TURN_COMPLETE, { turnCount: st.turnCount });
+        return { dialogue: parsed.dialogue, raw, parse: parsed, state: st };
+
+      } catch (e) {
+        if (e && e.code === 'LLM_ABORTED') {
+          this._finalizeAborted();
+          return null;
+        }
+        H.bus.emit(H.EVENTS.TURN_ERROR, e);
+        // Drop the pending user message and restore it to the input field so
+        // the user can hit Send again without retyping.
+        let pending = null;
+        if (this._history.length && this._history[this._history.length - 1].role === 'user') {
+          pending = this._history.pop();
+        }
+        this._persistHistory();
+        H.UIController.showError(e.code ? (e.code + ': ' + e.message) : e.message);
+        H.UIController.endAssistantStream();
+        H.UIController.renderChat(this._history);
+        if (pending) {
+          H.UIController._els.input.value = pending.content;
+          H.UIController._els.input.focus();
+        }
+        throw e;
+
+      } finally {
+        this._busy = false;
+        H.UIController.setBusy(false);
+      }
+    },
+
+    stop() { H.LLMClient.abort(); },
+
+    _finalizeAborted() {
+      const partial = (this._lastRawStream || '').trim();
+      if (partial) {
+        const parsed = H.ResponseParser.parse(partial);
+        if (parsed.stateDelta) H.StateManager.applyUpdate(parsed.stateDelta);
+        this._history.push({ role: 'assistant', content: parsed.dialogue || '(stopped)' });
+        const st = H.StateManager.get();
+        st.turnCount += 1;
+        H.StateManager.setField('turnCount', st.turnCount);
+      } else if (this._history.length && this._history[this._history.length - 1].role === 'user') {
+        this._history.pop();
+      }
+      this._persistHistory();
+      H.UIController.endAssistantStream();
+      H.UIController.renderChat(this._history);
+      H.UIController.renderStateView(H.StateManager.get());
+      H.UIController.updateStatus(H.StateManager.get());
+      H.bus.emit(H.EVENTS.TURN_COMPLETE, { aborted: true });
+    },
+
+    async regenerate() {
+      if (this._busy) return;
+      if (this._history.length && this._history[this._history.length - 1].role === 'assistant') {
+        this._history.pop();
+      }
+      let lastUser = null;
+      if (this._history.length && this._history[this._history.length - 1].role === 'user') {
+        lastUser = this._history.pop();
+      }
+      if (!lastUser) { H.UIController.renderChat(this._history); return; }
+      this._persistHistory();
+      H.UIController.renderChat(this._history);
+      try { await this.submit(lastUser.content); } catch (_) {}
+    },
+
+    async newChat() {
+      if (this._busy) return; // ignore during active turn
+      const ok = window.confirm('Start a new chat? This clears the transcript and resets state.');
+      if (!ok) return;
+
+      this._history = [];
+      H.StateManager.reset();
+      H.AntiLoopDetector.reset();
+      H.CompactionEngine._running = false;
+      H.CompactionEngine._log = [];
+      H.UIController.endAssistantStream();
+
+      const card = H.CharacterCardLoader.getActive();
+      if (card && card.firstMessage) {
+        this._history.push({ role: 'assistant', content: card.firstMessage });
+      }
+      this._persistHistory();
+      H.UIController.renderChat(this._history);
+      H.UIController.renderStateView(H.StateManager.get());
+      H.UIController.updateStatus(H.StateManager.get());
+      H.UIController._els.input.value = '';
+      H.UIController._els.input.focus();
+      H.DebugPanel.render({
+        messages: [], prompt: [], parse: { parseErrors: [] }, loop: {},
+        state: H.StateManager.get(), config: H.ConfigManager.getAll(),
+        debug: { sections: [], truncations: [], totalTokens: 0, capTokens: 0 },
+      });
+    },
+
+    /** Back-compat alias used by the old settings button. */
+    async reset() { return this.newChat(); },
+
+    getHistory() { return this._history.slice(); },
+    _persistHistory() { H.storage.set(H.STORAGE.HISTORY, this._history); },
+    setHistory(h) { this._history = h.slice(); this._persistHistory(); },
+  };
+
+  /* =========================================================================
+   * 11. UI CONTROLLER
+   * ========================================================================= */
+
+  H.UIController = {
+    _els: {},
+    _streamVisible: '',
+    _streamPending: '',
+    _suppressing: false,
+    _streamBubble: null,
+
+    init() {
+      this._els = {
+        chat:        document.getElementById('chat'),
+        input:       document.getElementById('input'),
+        send:        document.getElementById('send'),
+        stop:        document.getElementById('stop'),
+        regenerate:  document.getElementById('regenerate'),
+        newchat:     document.getElementById('newchat'),
+        stateView:   document.getElementById('state-view'),
+        statusLine:  document.getElementById('status-line'),
+        debugToggle: document.getElementById('debug-toggle'),
+        debugPanel:  document.getElementById('debug-panel'),
+        settings:    document.getElementById('settings'),
+      };
+
+      this._els.send.addEventListener('click', () => this._onSend());
+      this._els.stop.addEventListener('click', () => H.TurnController.stop());
+      this._els.newchat.addEventListener('click', () => H.TurnController.newChat());
+      this._els.input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this._onSend(); }
+      });
+      this._els.regenerate.addEventListener('click', () => H.TurnController.regenerate());
+      this._els.debugToggle.addEventListener('click', () => H.DebugPanel.toggle());
+
+      const portraitEl   = document.getElementById('portrait');
+      const portraitImg  = document.getElementById('portrait-img');
+      const portraitFile = document.getElementById('portrait-file');
+
+      this._els.portrait     = portraitEl;
+      this._els.portraitImg  = portraitImg;
+      this._els.portraitFile = portraitFile;
+
+      portraitEl.addEventListener('click', () => portraitFile.click());
+
+      portraitFile.addEventListener('change', (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (!f) return;
+        this._setPortraitFromFile(f);
+        e.target.value = ''; // allow re-picking the same file
+      });
+
+      this.renderPortrait();
+
+      H.bus.on(H.EVENTS.TURN_START, () => this.setBusy(true));
+      H.bus.on(H.EVENTS.TURN_COMPLETE, () => this.setBusy(false));
+      H.bus.on(H.EVENTS.TURN_ERROR, () => this.setBusy(false));
+      H.bus.on(H.EVENTS.STATE_UPDATED, ({ after }) => {
+        this.renderStateView(after);
+        this.updateStatus(after);
+      });
+
+      // Restore debug panel visibility from last session.
+      const ui = H.storage.get(H.STORAGE.UI, {}) || {};
+      if (ui.debugVisible) H.DebugPanel.show();
+      // Track whether the user is "following" the bottom of the chat.
+      // A scroll event is the only reliable signal of user intent — position
+      // alone misfires during the first overflow.
+      this._followBottom = true;
+      this._els.chat.addEventListener('scroll', () => {
+        const el = this._els.chat;
+        this._followBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 60;
+      }, { passive: true });
+    },
+
+    async _onSend() {
+      const text = this._els.input.value;
+      if (!text || !text.trim()) return;
+      this._els.input.value = '';
+      this._followBottom = true;   // ← new message: resume follow mode
+      try { await H.TurnController.submit(text); } catch (_) {}
+    },
+
+    _shouldAutoScroll() {
+      const el = this._els.chat;
+      return (el.scrollHeight - el.scrollTop - el.clientHeight) < 60;
+    },
+
+    _maybeScrollToBottom() {
+      if (!this._followBottom) return;
+      const el = this._els.chat;
+      el.scrollTop = el.scrollHeight;
+    },
+
+    _renderText(text) {
+      const esc = String(text == null ? '' : text).replace(/[&<>"]/g,
+        c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+      return esc
+        .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+    },
+
+    updateStatus(state) {
+      if (!this._els.statusLine) return;
+      const hist = H.TurnController.getHistory();
+      const cfg = H.ConfigManager.getAll();
+      const turns = (state && state.turnCount) || 0;
+      const tokens = H.PromptAssembler.estimateTokens(
+        hist.map(m => ({ role: m.role, content: m.content }))
+      );
+      const cap = cfg.contextLimit - cfg.maxTokens;
+      const ratio = cap > 0 ? tokens / cap : 0;
+      this._els.statusLine.textContent =
+        `turn ${turns} · ~${tokens} / ${cap} tokens · ${hist.length} messages`;
+      this._els.statusLine.classList.toggle('warn', ratio >= 0.75 && ratio < 0.9);
+      this._els.statusLine.classList.toggle('danger', ratio >= 0.9);
+    },
+
+    renderChat(history) {
+      const el = this._els.chat;
+      el.innerHTML = '';
+      this._streamBubble = null;
+      for (const m of history) this.appendMessage(m.role, m.content);
+      el.scrollTop = el.scrollHeight;
+      this._els.input.focus();
+      this.updateStatus(H.StateManager.get());
+    },
+
+    appendMessage(role, text) {
+      const div = document.createElement('div');
+      div.className = 'msg ' + role;
+      div.innerHTML = this._renderText(text);
+      if (role === 'assistant') {
+        const btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        btn.textContent = '⧉';
+        btn.title = 'Copy';
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const clone = div.cloneNode(true);
+          clone.querySelectorAll('.copy-btn').forEach(b => b.remove());
+          const plain = clone.textContent;
+          const done = () => { btn.textContent = '✓'; setTimeout(() => { btn.textContent = '⧉'; }, 1200); };
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(plain).then(done).catch(() => {});
+          } else {
+            const ta = document.createElement('textarea');
+            ta.value = plain; document.body.appendChild(ta); ta.select();
+            try { document.execCommand('copy'); done(); } catch (_) {}
+            ta.remove();
+          }
+        });
+        div.appendChild(btn);
+      }
+      this._els.chat.appendChild(div);
+      this._maybeScrollToBottom();
+      return div;
+    },
+
+    beginAssistantStream() {
+      this._streamVisible = '';
+      this._streamPending = '';
+      this._suppressing = false;
+      this._streamBubble = this.appendMessage('assistant', '');
+      this._streamBubble.classList.add('streaming');
+    },
+
+    endAssistantStream() {
+      if (this._streamBubble) {
+        // Flush any leftover visible tail (fixes the "last 7 chars vanish" bug).
+        if (!this._suppressing && this._streamPending) {
+          this._streamVisible += this._streamPending;
+          this._streamPending = '';
+        }
+        this._streamBubble.classList.remove('streaming');
+        this._streamBubble.innerHTML = this._renderText(this._streamVisible);
+      }
+      this._streamBubble = null;
+      this._streamVisible = '';
+      this._streamPending = '';
+      this._suppressing = false;
+    },
+
+    appendStreamingToken(token) {
+      const OPEN = '[STATE]', CLOSE = '[/STATE]';
+      for (const ch of token) {
+        this._streamPending += ch;
+
+        if (this._suppressing) {
+          if (this._streamPending.endsWith(CLOSE)) {
+            this._streamPending = '';
+            this._suppressing = false;
+          } else if (this._streamPending.length > CLOSE.length) {
+            this._streamPending = this._streamPending.slice(-CLOSE.length);
+          }
+        } else {
+          if (this._streamPending.endsWith(OPEN)) {
+            const before = this._streamPending.slice(0, -OPEN.length);
+            this._streamVisible += before;
+            this._streamPending = '';
+            this._suppressing = true;
+          } else if (this._streamPending.length > OPEN.length) {
+            const flush = this._streamPending.slice(0, -OPEN.length);
+            this._streamVisible += flush;
+            this._streamPending = this._streamPending.slice(-OPEN.length);
+          }
+        }
+      }
+      this._renderStreamingBubble(this._streamVisible);
+    },
+
+    _renderStreamingBubble(text) {
+      if (!this._streamBubble) return;
+      this._streamBubble.innerHTML = this._renderText(text);
+      this._maybeScrollToBottom();
+    },
+
+    setBusy(busy) {
+      this._els.input.disabled = busy;
+      this._els.send.disabled = busy;
+      this._els.regenerate.disabled = busy;
+      this._els.newchat.disabled = busy;
+      this._els.stop.style.display = busy ? '' : 'none';
+      this._els.send.style.display = busy ? 'none' : '';
+      if (!busy) {
+        try { this._els.input.focus(); } catch (_) {}
+      }
+    },
+
+    showError(message) {
+      const el = document.createElement('div');
+      el.className = 'msg system';
+      el.textContent = '⚠ ' + message;
+      this._els.chat.appendChild(el);
+      this._els.chat.scrollTop = this._els.chat.scrollHeight;
+      setTimeout(() => { el.style.transition = 'opacity 0.4s'; el.style.opacity = '0.4'; }, 4000);
+    },
+
+    renderStateView(state) {
+      this._els.stateView.textContent = JSON.stringify(state, null, 0);
+    },
+
+      _portraitKey() {
+        const card = H.CharacterCardLoader.getActive();
+        return 'harness.portrait.' + ((card && card.name) || 'default');
+      },
+
+    renderPortrait() {
+      const key = this._portraitKey();
+      const data = H.storage.get(key, null);
+      const el  = this._els.portrait;
+      const img = this._els.portraitImg;
+      if (data) {
+        img.src = data;
+        el.classList.add('has-image');
+      } else {
+        img.removeAttribute('src');
+        el.classList.remove('has-image');
+      }
+    },
+
+    _setPortraitFromFile(file) {
+      if (!file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          // Cap at 512x512 preserving aspect, then JPEG-encode.
+          const MAX = 512;
+          let w = img.width, h = img.height;
+          const scale = Math.min(1, MAX / Math.max(w, h));
+          w = Math.round(w * scale);
+          h = Math.round(h * scale);
+
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+
+          const data = canvas.toDataURL('image/jpeg', 0.85);
+          try {
+            H.storage.set(this._portraitKey(), data);
+            this.renderPortrait();
+          } catch (e) {
+            alert('Portrait too large to store. Try a smaller image.');
+          }
+        };
+        img.onerror = () => alert('Could not read that image.');
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    },
+
+    /* ---- Settings panel ---- */
+
+    _renderSettings() {
+      const el = this._els.settings;
+      el.innerHTML = '';
+
+      const details = document.createElement('details');
+      const summary = document.createElement('summary');
+      summary.textContent = '⚙ Settings';
+      details.appendChild(summary);
+
+      // --- Character card picker ---
+      const cardHeading = document.createElement('div');
+      cardHeading.textContent = 'Character';
+      cardHeading.className = 'hint';
+      cardHeading.style.marginTop = '10px';
+      details.appendChild(cardHeading);
+
+      const lib = H.CharacterCardLoader.getLibrary();
+      const active = H.CharacterCardLoader.getActive();
+      const picker = document.createElement('select');
+      const customOpt = document.createElement('option');
+      customOpt.value = '__custom__';
+      customOpt.textContent = '— Custom (edit below) —';
+      picker.appendChild(customOpt);
+      for (const entry of lib) {
+        const o = document.createElement('option');
+        o.value = entry.id;
+        o.textContent = entry.name;
+        if (active && active.name === (entry.data.name || '')) o.selected = true;
+        picker.appendChild(o);
+      }
+      details.appendChild(picker);
+
+      const cardArea = document.createElement('textarea');
+      cardArea.style.marginTop = '6px';
+      cardArea.value = active ? JSON.stringify(active._raw || {
+        name: active.name,
+        systemPrompt: active.systemPrompt,
+        firstMessage: active.firstMessage,
+      }, null, 2) : '';
+      details.appendChild(cardArea);
+
+      picker.addEventListener('change', () => {
+        const id = picker.value;
+        if (id === '__custom__') return;
+        const entry = lib.find(e => e.id === id);
+        if (!entry) return;
+        cardArea.value = JSON.stringify(entry.data, null, 2);
+      });
+
+      const actions = document.createElement('div');
+      actions.id = 'card-actions';
+      const btn = (label, fn) => {
+        const b = document.createElement('button');
+        b.textContent = label;
+        b.addEventListener('click', fn);
+        return b;
+      };
+
+      actions.appendChild(btn('Load card', () => {
+        try {
+          const card = H.CharacterCardLoader.load(cardArea.value);
+          H.CharacterCardLoader.setActive(card);
+          const hist = H.TurnController.getHistory();
+          // Only reseed the greeting if the transcript is empty or a lone greeting.
+          if (hist.length <= 1) {
+            H.TurnController.setHistory(card.firstMessage
+              ? [{ role: 'assistant', content: card.firstMessage }] : []);
+            H.UIController.renderChat(H.TurnController.getHistory());
+          }
+          H.Logger.log('info', 'UIController', 'card_loaded', { name: card.name });
+        } catch (e) { alert('Card load failed: ' + e.message); }
+      }));
+
+      actions.appendChild(btn('Save to library', () => {
+        try {
+          const card = H.CharacterCardLoader.load(cardArea.value);
+          H.CharacterCardLoader.saveCustomCard(card);
+          H.UIController._renderSettings();
+          alert('Saved: ' + card.name);
+        } catch (e) { alert('Save failed: ' + e.message); }
+      }));
+
+      actions.appendChild(btn('Export all', () => H.ExportManager.exportToFile()));
+      actions.appendChild(btn('Import all', () => H.ExportManager.importFromFile().catch(e => alert('Import failed: ' + e.message))));
+
+      details.appendChild(actions);
+
+      // --- Config grid ---
+      const grid = document.createElement('div');
+      grid.className = 'grid';
+      grid.style.marginTop = '14px';
+
+      const cfg = H.ConfigManager.getAll();
+      const fields = [
+      ['Backend',          'backend',             'select', ['mock', 'native', 'openai']],
+      ['Chat template',    'chatTemplate',        'select', ['llama3', 'chatml', 'plain']],
+        ['Endpoint',         'endpoint',            'text',   null],
+        ['Model',            'model',               'text',   null],
+        ['Mock scenario',    'mockScenario',        'select', Object.keys(H.LLMClient.MOCK_RESPONSES)],
+        ['Temperature',      'temperature',         'number', { step: 0.05, min: 0, max: 2 }],
+        ['Top P',            'topP',                'number', { step: 0.05, min: 0, max: 1 }],
+        ['Max tokens',       'maxTokens',           'number', { step: 10, min: 16, max: 2048 }],
+        ['Verbatim turns',   'verbatimTurns',       'number', { step: 1, min: 0, max: 20 }],
+        ['Context limit',    'contextLimit',        'number', { step: 100, min: 400, max: 8192 }],
+        ['Merge sys msgs',   'mergeSystemMessages', 'checkbox', null],
+        ['Loop check',       'loopCheckEnabled',    'checkbox', null],
+        ['Compaction',       'compactionEnabled',   'checkbox', null],
+      ];
+
+      for (const [label, key, type, extra] of fields) {
+        const lab = document.createElement('label');
+        lab.textContent = label;
+        grid.appendChild(lab);
+
+        let inp;
+        if (type === 'select') {
+          inp = document.createElement('select');
+          for (const opt of extra) {
+            const o = document.createElement('option');
+            o.value = opt; o.textContent = opt;
+            inp.appendChild(o);
+          }
+          inp.value = cfg[key];
+        } else if (type === 'checkbox') {
+          inp = document.createElement('input');
+          inp.type = 'checkbox';
+          inp.checked = !!cfg[key];
+        } else {
+          inp = document.createElement('input');
+          inp.type = type;
+          if (extra) {
+            if (extra.step !== undefined) inp.step = extra.step;
+            if (extra.min !== undefined) inp.min = extra.min;
+            if (extra.max !== undefined) inp.max = extra.max;
+          }
+          inp.value = cfg[key];
+        }
+
+        inp.addEventListener('change', () => {
+          let v;
+          if (type === 'checkbox') v = inp.checked;
+          else if (type === 'number') v = Number(inp.value);
+          else v = inp.value;
+          H.ConfigManager.set(key, v);
+        });
+
+        grid.appendChild(inp);
+      }
+
+      details.appendChild(grid);
+      el.appendChild(details);
+    },
+  };
+
+  /* =========================================================================
+   * 12. DEBUG PANEL
+   * ========================================================================= */
+
+  H.DebugPanel = {
+    _els: {},
+    _last: null,
+    _visible: false,
+
+    init() { this._els.panel = document.getElementById('debug-panel'); },
+
+    render(payload) {
+      this._last = payload;
+      if (!this._visible) return;
+      this._paint();
+    },
+
+    _paint() {
+      const el = this._els.panel;
+      if (!el) return;
+      const p = this._last || {};
+      const d = p.debug || { sections: [], truncations: [], totalTokens: 0, capTokens: 0 };
+      const lines = [];
+      lines.push('=== TURN DEBUG ===');
+      lines.push('tokens: ' + d.totalTokens + ' / cap ' + d.capTokens);
+      lines.push('');
+      lines.push('Sections:');
+      for (const s of d.sections) {
+        lines.push('  ' + s.name + ': ' + s.tokens + 't' + (s.trimmed ? ' (trimmed)' : ''));
+      }
+      if (d.truncations && d.truncations.length) {
+        lines.push('');
+        lines.push('Truncations:');
+        for (const t of d.truncations) lines.push('  - ' + JSON.stringify(t));
+      }
+      lines.push('');
+      lines.push('Parse errors: ' + ((p.parse && p.parse.parseErrors && p.parse.parseErrors.join(', ')) || 'none'));
+      lines.push('');
+      lines.push('State delta: ' + JSON.stringify(p.parse && p.parse.stateDelta));
+      lines.push('Loop: ' + JSON.stringify(p.loop || {}));
+      lines.push('');
+      lines.push('Messages:');
+      for (const m of (p.messages || [])) {
+        const c = (m.content || '');
+        lines.push('[' + m.role + '] ' + (c.length > 400 ? c.slice(0, 400) + '…' : c));
+        lines.push('');
+      }
+      el.textContent = lines.join('\n');
+    },
+
+    show() {
+      this._visible = true;
+      this._els.panel.style.display = 'block';
+      this._paint();
+      const ui = H.storage.get(H.STORAGE.UI, {}) || {};
+      ui.debugVisible = true; H.storage.set(H.STORAGE.UI, ui);
+    },
+
+    hide() {
+      this._visible = false;
+      this._els.panel.style.display = 'none';
+      const ui = H.storage.get(H.STORAGE.UI, {}) || {};
+      ui.debugVisible = false; H.storage.set(H.STORAGE.UI, ui);
+    },
+
+    toggle() { this._visible ? this.hide() : this.show(); },
+  };
+
+  /* =========================================================================
+   * 13. EXPORT MANAGER
+   * ========================================================================= */
+
+  H.ExportManager = {
+    FORMAT_VERSION: 1,
+
+    export() {
+      return {
+        formatVersion: this.FORMAT_VERSION,
+        exportedAt: new Date().toISOString(),
+        config: H.ConfigManager.getAll(),
+        state: H.StateManager.get(),
+        card: H.CharacterCardLoader.getActive(),
+        history: H.TurnController.getHistory(),
+      };
+    },
+
+    import(blob) {
+      if (!blob || typeof blob !== 'object') throw new HarnessError('IMPORT_INVALID', 'not an object');
+      if (blob.formatVersion !== this.FORMAT_VERSION) {
+        throw new HarnessError('IMPORT_INVALID', 'format version mismatch');
+      }
+      if (blob.config) {
+        Object.assign(H.ConfigManager._config, blob.config);
+        H.ConfigManager.save();
+        H.bus.emit(H.EVENTS.CONFIG_CHANGED, { imported: true });
+      }
+      if (blob.state) H.StateManager.applySnapshot(blob.state);
+      if (blob.card) {
+        try { H.CharacterCardLoader.setActive(H.CharacterCardLoader.load(blob.card._raw || blob.card)); }
+        catch (e) { H.Logger.log('warn', 'ExportManager', 'card_import_failed', e.message); }
+      }
+      if (Array.isArray(blob.history)) H.TurnController.setHistory(blob.history);
+
+      H.UIController.renderChat(H.TurnController.getHistory());
+      H.UIController.renderStateView(H.StateManager.get());
+      H.UIController.updateStatus(H.StateManager.get());
+      H.UIController._renderSettings();
+    },
+
+    exportToFile() {
+      const data = JSON.stringify(this.export(), null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'harness-export-' + Date.now() + '.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
+
+    async importFromFile() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'application/json,.json';
+      const file = await new Promise((res) => {
+        input.onchange = () => res(input.files && input.files[0]);
+        input.click();
+      });
+      if (!file) return;
+      const text = await file.text();
+      let blob;
+      try { blob = JSON.parse(text); }
+      catch (e) { throw new HarnessError('IMPORT_INVALID', 'not JSON'); }
+      this.import(blob);
+    },
+
+    async loadFromUrl(url) {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new HarnessError('IMPORT_HTTP', 'HTTP ' + resp.status);
+      const blob = await resp.json();
+      this.import(blob);
+    },
+  };
+
+  /* =========================================================================
+   * BOOTSTRAP
+   * ========================================================================= */
+
+  document.addEventListener('DOMContentLoaded', () => {
+    H.TurnController.init().catch(e => {
+      // eslint-disable-next-line no-console
+      console.error('Bootstrap failed', e);
+      alert('Bootstrap failed: ' + (e && e.message ? e.message : e));
+    });
+  });
+</script>
+</body>
+</html>

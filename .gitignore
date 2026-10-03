@@ -1,0 +1,17 @@
+# Android / Gradle build artifacts
+.gradle/
+build/
+app/build/
+.cxx/
+local.properties
+.idea/
+captures/
+*.iml
+
+# Nested git repo (llama.cpp has its own .git from the clone)
+app/src/main/cpp/llama.cpp/.git/
+app/src/main/cpp/llama.cpp/build/
+
+# Model files (huge — keep them out of version control)
+*.gguf
+app/src/main/assets/models/
