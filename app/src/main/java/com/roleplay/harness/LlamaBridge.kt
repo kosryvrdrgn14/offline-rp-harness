@@ -20,6 +20,13 @@ class LlamaBridge(
         ModelLoader.ensureExtracted(context).absolutePath
     }
 
+    // Last-used load-time params. If a generate call arrives with different
+    // values, we free and reload the model rather than silently keeping the
+    // old configuration.
+    private var lastNCtx: Int = -1
+    private var lastNThreads: Int = -1
+    private var lastNBatch: Int = -1
+
     private fun logMem(label: String) {
         try {
             val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
@@ -30,14 +37,32 @@ class LlamaBridge(
         } catch (_: Exception) {}
     }
 
-    private fun ensureLoaded(): Boolean {
+    private fun ensureLoaded(nCtx: Int, nThreads: Int, nBatch: Int): Boolean {
         synchronized(loadLock) {
+            val paramsChanged = modelLoaded && (
+                    nCtx      != lastNCtx ||
+                            nThreads  != lastNThreads ||
+                            nBatch    != lastNBatch
+                    )
+            if (paramsChanged) {
+                Log.i("Harness",
+                    "load params changed (nCtx=$nCtx nThreads=$nThreads nBatch=$nBatch) — reloading")
+                NativeLib.freeModel()
+                modelLoaded = false
+            }
+
             if (modelLoaded) return true
+
             logMem("before loadModel")
             val path = modelPath
-            // n_ctx=1024 instead of 2048 to halve KV cache and lower load spike.
-            val ok = NativeLib.loadModel(path, 1024, 4)
+            val ok = NativeLib.loadModel(path, nCtx, nThreads, nBatch)
             logMem("after loadModel")
+
+            if (ok) {
+                lastNCtx     = nCtx
+                lastNThreads = nThreads
+                lastNBatch   = nBatch
+            }
             modelLoaded = ok
             return ok
         }
@@ -64,11 +89,16 @@ class LlamaBridge(
     fun generate(prompt: String, requestId: String, paramsJson: String) {
         Thread {
             try {
-                if (!ensureLoaded()) {
+                val p = JSONObject(paramsJson)
+
+                val nCtx      = p.optInt("nCtx", 1024)
+                val nThreads  = p.optInt("nThreads", 4)
+                val nBatch    = p.optInt("nBatch", 256)
+
+                if (!ensureLoaded(nCtx, nThreads, nBatch)) {
                     throw IllegalStateException("model failed to load")
                 }
 
-                val p = JSONObject(paramsJson)
                 val callback = object : NativeLib.TokenCallback {
                     override fun onToken(token: String) {
                         val quoted = JSONObject.quote(token)

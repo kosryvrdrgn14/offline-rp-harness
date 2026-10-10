@@ -11,7 +11,7 @@ object NativeLib {
 
     external fun hello(): String
 
-    external fun loadModel(path: String, nCtx: Int, nThreads: Int): Boolean
+    external fun loadModel(path: String, nCtx: Int, nThreads: Int, nBatch: Int): Boolean
 
     external fun freeModel()
 

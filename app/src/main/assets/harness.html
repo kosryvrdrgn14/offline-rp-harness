@@ -465,6 +465,12 @@
       desiredMood: '',
       customMoods: [],
 
+      // Load-time parameters. Changing any of these triggers a model reload
+      // on the next generate() call (5-15s on the phone).
+      nCtx: 1024,
+      nThreads: 4,
+      nBatch: 256,
+
       activeCardId: 'nisa',
 
       backend: 'mock',
@@ -1112,6 +1118,11 @@
         topK:              config.topK,
         repetitionPenalty: config.repetitionPenalty,
         maxTokens:         config.maxTokens,
+        // Load-time params — LlamaBridge compares these to what's currently
+        // loaded and reloads the model if they've changed.
+        nCtx:              config.nCtx,
+        nThreads:          config.nThreads,
+        nBatch:            config.nBatch,
       });
       return await new Promise((resolve, reject) => {
         window.__nativeCallbacks[requestId] = { onToken, onDone: resolve, onError: reject };
@@ -2673,9 +2684,28 @@
         ['Name prefix',      'namePosePrefix',      'checkbox', null],
         ['Loop check',       'loopCheckEnabled',    'checkbox', null],
         ['Compaction',       'compactionEnabled',   'checkbox', null],
+        ['State classifier', 'stateClassifierEnabled', 'checkbox', null],
+
+        ['Load-time — change triggers model reload', '__perf__', 'divider', null],
+        ['Context window',   'nCtx',                'number', { step: 128, min: 512, max: 2048 }],
+        ['Threads',          'nThreads',            'number', { step: 1, min: 2, max: 8 }],
+        ['Batch size',       'nBatch',              'number', { step: 64, min: 128, max: 512 }],
       ];
 
       for (const [label, key, type, extra] of fields) {
+        if (type === 'divider') {
+          const d = document.createElement('div');
+          d.style.gridColumn = '1 / -1';
+          d.style.borderTop = '1px solid #333';
+          d.style.paddingTop = '10px';
+          d.style.marginTop = '6px';
+          d.style.color = '#888';
+          d.style.fontSize = '0.72rem';
+          d.textContent = label;
+          grid.appendChild(d);
+          continue;
+        }
+
         const lab = document.createElement('label');
         lab.textContent = label;
         grid.appendChild(lab);

@@ -19,20 +19,21 @@ static struct {
     const llama_vocab* vocab = nullptr;
     int                n_ctx = 2048;
     int                n_threads = 4;
+    int                n_batch = 256;
 } g_state;
 
 static volatile bool g_abort = false;
 
 // -----------------------------------------------------------------------------
-// Internal: create a fresh context. Called before each generation because the
-// harness resends the full prompt every turn — the old KV cache must be cleared.
+// Internal: create a fresh context. Called once at loadModel time. Each
+// generate() call reuses the same context and clears the KV cache instead.
 // -----------------------------------------------------------------------------
 static bool recreateContext() {
     if (g_state.ctx) { llama_free(g_state.ctx); g_state.ctx = nullptr; }
 
     llama_context_params cparams = llama_context_default_params();
     cparams.n_ctx           = g_state.n_ctx;
-    cparams.n_batch         = 512;
+    cparams.n_batch         = g_state.n_batch;
     cparams.n_threads       = g_state.n_threads;
     cparams.n_threads_batch = g_state.n_threads;
 
@@ -55,14 +56,15 @@ Java_com_roleplay_harness_NativeLib_hello(JNIEnv* env, jobject /* this */) {
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_roleplay_harness_NativeLib_loadModel(
         JNIEnv* env, jobject /* this */,
-        jstring jpath, jint n_ctx, jint n_threads)
+        jstring jpath, jint n_ctx, jint n_threads, jint n_batch)
 {
     if (g_state.ctx)   { llama_free(g_state.ctx);         g_state.ctx = nullptr; }
     if (g_state.model) { llama_model_free(g_state.model); g_state.model = nullptr; }
     g_state.vocab = nullptr;
 
     const char* path = env->GetStringUTFChars(jpath, nullptr);
-    LOGI("loadModel: path=%s n_ctx=%d n_threads=%d", path, n_ctx, n_threads);
+    LOGI("loadModel: path=%s n_ctx=%d n_threads=%d n_batch=%d",
+         path, n_ctx, n_threads, n_batch);
 
     llama_model_params mparams = llama_model_default_params();
     // mmap is default-on in this version of llama.cpp.
@@ -79,6 +81,7 @@ Java_com_roleplay_harness_NativeLib_loadModel(
     g_state.vocab     = llama_model_get_vocab(g_state.model);
     g_state.n_ctx     = n_ctx;
     g_state.n_threads = n_threads;
+    g_state.n_batch   = n_batch;
 
     if (!recreateContext()) {
         LOGE("loadModel: llama_init_from_model returned null");
@@ -138,12 +141,10 @@ Java_com_roleplay_harness_NativeLib_generate(
         return env->NewStringUTF("");
     }
 
-    // Fresh KV cache for this turn.
-    if (!recreateContext()) {
-        LOGE("generate: context recreation failed");
-        env->DeleteLocalRef(cbClass);
-        return env->NewStringUTF("");
-    }
+    // Clear the KV cache in place. The context, logits buffer, and compute
+    // scratch stay allocated — only the token positions are wiped. This
+    // avoids the free/realloc churn that stacked peak memory on multi-pass.
+    llama_memory_clear(llama_get_memory(g_state.ctx), /*data=*/true);
 
     // ---- Tokenize the prompt ----
     const char* prompt_cstr = env->GetStringUTFChars(jprompt, nullptr);
@@ -188,9 +189,10 @@ Java_com_roleplay_harness_NativeLib_generate(
     llama_sampler_chain_add(chain, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
 
     // ---- Decode the prompt in n_batch-sized chunks ----
-    const int n_batch = 512;
-    for (int i = 0; i < n_tokens; i += n_batch) {
-        int chunk = (n_tokens - i < n_batch) ? (n_tokens - i) : n_batch;
+    for (int i = 0; i < n_tokens; i += g_state.n_batch) {
+        int chunk = (n_tokens - i < g_state.n_batch)
+                    ? (n_tokens - i)
+                    : g_state.n_batch;
         if (llama_decode(g_state.ctx,
                          llama_batch_get_one(tokens.data() + i, chunk)) != 0) {
             LOGE("generate: prompt decode failed at offset %d", i);
