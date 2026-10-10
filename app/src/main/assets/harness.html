@@ -38,7 +38,17 @@
     }
     .msg.user { background: #1e3a5f; align-self: flex-end; }
     .msg.assistant { background: #2a2a2a; align-self: flex-start; }
+
     .msg.system { background: #333; font-style: italic; font-size: 0.85rem; opacity: 0.85; align-self: center; max-width: 100%; }
+    .msg.thinking {
+      background: #1a1a2a; color: #89a; font-style: italic;
+      align-self: flex-start; font-size: 0.85rem;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.6; }
+      50%      { opacity: 1.0; }
+    }
     .msg em { color: #cbd; font-style: italic; }
     .msg strong { color: #fff; font-weight: 600; }
     .msg .copy-btn {
@@ -154,8 +164,6 @@
       background: #2a2a3a; color: #aac; margin-left: 6px;
       vertical-align: middle;
     }
-    .badge.locked { background: #3a2a1e; color: #caa; }
-
     .badge.locked { background: #3a2a1e; color: #caa; }
 
     .modal-overlay {
@@ -470,6 +478,16 @@
       nCtx: 1024,
       nThreads: 4,
       nBatch: 256,
+
+      // Multi-pass: state classifier reads the reply and overrides mood/action.
+      stateClassifierEnabled: false,
+      classifierTemperature: 0.1,
+      classifierMaxTokens: 60,
+
+      // Multi-pass: planning pass runs before writing to produce a scene plan.
+      planningEnabled: false,
+      planTemperature: 0.3,
+      planMaxTokens: 100,
 
       activeCardId: 'nisa',
 
@@ -911,6 +929,8 @@
       '- Portraits: each character has their own portrait image.\n' +
       '- Multi-pass generation (planned): a planner + writer + optional reviewer pipeline that improves reply quality at the cost of speed.\n' +
       '- If asked about a feature not yet built, say it is planned or unavailable and offer what is available.\n' +
+      '- NEVER invent features, menus, buttons, content, or capabilities that are not listed above. If you are unsure whether something exists, say you are not sure and suggest the user check Settings.\n' +
+      '- Do not claim the app contains media (videos, music, manga, images beyond portraits) unless the user has told you they added such content themselves.\n' +
       '- Keep replies about the app brief and practical.',
 
     assemble(state, history, card, newUserInput, opts) {
@@ -942,6 +962,11 @@
       }
 
       if (opts && opts.pendingCorrection) sys += '\n\n' + opts.pendingCorrection;
+
+      if (opts && opts.plan && typeof opts.plan === 'object') {
+        sys += '\n\nPLAN FOR THIS TURN:\n' + JSON.stringify(opts.plan) + '\n' +
+               'Follow this plan. Match the described action, dialogue topic, and tone.';
+      }
 
       if (cfg.mergeSystemMessages !== false) {
         const merged = sys + '\n\n' + stateBlock;
@@ -1263,6 +1288,72 @@
     },
   };
 
+  /* =========================================================================
+   * 8. MULTI-PASS ENGINE + ANTI-LOOP DETECTOR
+   * ========================================================================= */
+
+  H.MultiPassEngine = {
+    buildPlanPrompt(state, history, card, userInput) {
+      const name = (card && card.name) || 'the character';
+      const recent = history.slice(-6).map(m => m.role + ': ' + m.content).join('\n');
+      return [
+        'You are a scene planner. Analyze the conversation and output ONLY a JSON object.',
+        'Do not write dialogue or narration — only the plan.',
+        '',
+        'Character: ' + name,
+        'Current state: ' + JSON.stringify(state),
+        'Recent transcript:',
+        recent,
+        'Latest user message: ' + userInput,
+        '',
+        'Output format (strict JSON, no prose, no markdown fences):',
+        '{"does":"brief physical action for the character",',
+        ' "says":"brief topic of what the character will say",',
+        ' "tone":"emotional tone of this beat",',
+        ' "advances":"what moves forward in this turn"}',
+      ].join('\n');
+    },
+
+    parseJSONish(text) {
+      const cleaned = (text || '').replace(/^```(?:json)?|```$/g, '').trim();
+      try { return JSON.parse(cleaned); }
+      catch (_) { return H.ResponseParser.repairJSON(cleaned); }
+    },
+  };
+
+  H.StateClassifier = {
+    buildPrompt(reply) {
+      return [
+        'You are a state classifier. Read the roleplay reply below and output',
+        'ONLY a JSON object describing the assistant character\'s current state.',
+        '',
+        'Output format:',
+        '{"mood":"neutral|happy|sad|angry|wary|warm",',
+        ' "action":"one or two words, present participle, or empty string"}',
+        '',
+        'Rules:',
+        '- Use only the listed mood values.',
+        '- Action is 1-2 words, present participle, or empty string.',
+        '- No prose. No markdown. No explanation. No code fences.',
+        '',
+        'Reply to classify:',
+        reply,
+      ].join('\n');
+    },
+
+    parse(text) {
+      const cleaned = (text || '').replace(/^```(?:json)?|```$/g, '').trim();
+      let j = null;
+      try { j = JSON.parse(cleaned); }
+      catch (_) { j = H.ResponseParser.repairJSON(cleaned); }
+      if (!j || typeof j !== 'object') return null;
+      return {
+        mood:   String(j.mood   || '').toLowerCase().trim(),
+        action: String(j.action || '').toLowerCase().trim(),
+      };
+    },
+  };
+
   H.AntiLoopDetector = {
     BUFFER_SIZE: 5,
     _recent: [],
@@ -1271,6 +1362,14 @@
       opening_repeat: 'Vary your opening. Do not begin with the same structure as previous responses.',
       suffix_replay:  'Do not repeat earlier phrasing. Advance the scene.',
     },
+    seed(text) {
+      const t = (text || '').trim();
+      if (t) {
+        this._recent.push(t);
+        if (this._recent.length > this.BUFFER_SIZE) this._recent.shift();
+      }
+    },
+
     check(newOutput) {
       const reasons = [];
       let correction = null;
@@ -1423,6 +1522,7 @@
       if (this._history.length === 0 && card && card.firstMessage) {
         this._history.push({ role: 'assistant', content: card.firstMessage });
         this._persistHistory();
+        H.AntiLoopDetector.seed(card.firstMessage);
       }
 
       H.UIController.renderChat(this._history);
@@ -1459,15 +1559,26 @@
         this._history.push({ role: 'user', content: userInput });
         H.UIController.appendMessage('user', userInput);
 
-        const correction = H.AntiLoopDetector.consumeCorrection();
-        const { messages, debug } = H.PromptAssembler.assemble(
-          H.StateManager.get(), this._history, card, userInput,
-          { pendingCorrection: correction, config: cfg }
-        );
+      const correction = H.AntiLoopDetector.consumeCorrection();
 
-        this._lastRawStream = '';
-        H.UIController.beginAssistantStream();
-        const raw = await H.LLMClient.generateStream(messages, cfg, (tok) => {
+      // Optional planning pass. Runs before the writing pass, produces a
+      // short JSON plan, and injects it into the system prompt.
+      let plan = null;
+      if (cfg.planningEnabled) {
+        H.UIController.showThinking('planning…');
+        plan = await this._runPlanningPass(card, cfg, userInput);
+        H.Logger.log('info', 'MultiPass', 'plan_generated', plan);
+      }
+
+      const { messages, debug } = H.PromptAssembler.assemble(
+        H.StateManager.get(), this._history, card, userInput,
+        { pendingCorrection: correction, plan: plan, config: cfg }
+      );
+
+      this._lastRawStream = '';
+      H.UIController.hideThinking();
+      H.UIController.beginAssistantStream();
+      const raw = await H.LLMClient.generateStream(messages, cfg, (tok) => {
           this._lastRawStream += tok;
           H.UIController.appendStreamingToken(tok);
         });
@@ -1484,6 +1595,22 @@
         }
 
         if (parsed.stateDelta) H.StateManager.applyUpdate(parsed.stateDelta);
+
+        // Reply is complete — settle the bubble before the classifier runs.
+        H.UIController.endAssistantStream();
+
+        // Optional state classifier pass. Reads the reply and overrides
+        // mood/action with a cleaner read of what actually happened.
+        if (cfg.stateClassifierEnabled && parsed.dialogue) {
+          H.UIController.showThinking('classifying…');
+          const classified = await this._runStateClassifier(parsed.dialogue, cfg);
+          H.UIController.hideThinking();
+          if (classified) {
+            if (classified.mood)   H.StateManager.setField('mood', classified.mood);
+            if (classified.action) H.StateManager.setField('action', classified.action);
+            H.Logger.log('info', 'StateClassifier', 'applied', classified);
+          }
+        }
 
         if (cfg.compactionEnabled) {
           H.CompactionEngine.maybeCompact(
@@ -1521,6 +1648,7 @@
         }
         this._persistHistory();
         H.UIController.showError(e.code ? (e.code + ': ' + e.message) : e.message);
+        H.UIController.hideThinking();
         H.UIController.endAssistantStream();
         H.UIController.renderChat(this._history);
         if (pending) {
@@ -1549,6 +1677,7 @@
         this._history.pop();
       }
       this._persistHistory();
+      H.UIController.hideThinking();
       H.UIController.endAssistantStream();
       H.UIController.renderChat(this._history);
       H.UIController.renderStateView(H.StateManager.get());
@@ -1601,8 +1730,17 @@
             this._history.push({ role: 'assistant', content: ex.assistant.trim() });
           }
         }
+        // Seed the loop detector with the scene's last assistant message
+        // so any later echo of it gets caught.
+        for (let i = this._history.length - 1; i >= 0; i--) {
+          if (this._history[i].role === 'assistant') {
+            H.AntiLoopDetector.seed(this._history[i].content);
+            break;
+          }
+        }
       } else if (card && card.firstMessage) {
         this._history.push({ role: 'assistant', content: card.firstMessage });
+        H.AntiLoopDetector.seed(card.firstMessage);
       }
 
       this._persistHistory();
@@ -1619,6 +1757,52 @@
       });
     },
 
+    async _runPlanningPass(card, cfg, userInput) {
+      const plannerSystem =
+        'You are a scene planner for roleplay. Output ONLY a JSON object with keys ' +
+        '"does", "says", "tone", "advances". No prose. No markdown fences.';
+      const planPrompt = H.MultiPassEngine.buildPlanPrompt(
+        H.StateManager.get(), this._history, card, userInput
+      );
+      const planMessages = [
+        { role: 'system', content: plannerSystem },
+        { role: 'user', content: planPrompt },
+      ];
+      const planCfg = Object.assign({}, cfg, {
+        temperature: cfg.planTemperature,
+        maxTokens:   cfg.planMaxTokens,
+      });
+      try {
+        const raw = await H.LLMClient.generate(planMessages, planCfg);
+        return H.MultiPassEngine.parseJSONish(raw);
+      } catch (e) {
+        H.Logger.log('warn', 'MultiPass', 'plan_failed', e.message);
+        return null;
+      }
+    },
+
+    async _runStateClassifier(reply, cfg) {
+      const systemMsg =
+        'You are a state classifier. Output ONLY a JSON object. ' +
+        'No prose. No markdown fences. No explanation.';
+      const userMsg = H.StateClassifier.buildPrompt(reply);
+      const messages = [
+        { role: 'system', content: systemMsg },
+        { role: 'user', content: userMsg },
+      ];
+      const classCfg = Object.assign({}, cfg, {
+        temperature: cfg.classifierTemperature,
+        maxTokens:   cfg.classifierMaxTokens,
+      });
+      try {
+        const raw = await H.LLMClient.generate(messages, classCfg);
+        return H.StateClassifier.parse(raw);
+      } catch (e) {
+        H.Logger.log('warn', 'StateClassifier', 'classify_failed', e.message);
+        return null;
+      }
+    },
+
     async reset() { return this.newChat(); },
     getHistory() { return this._history.slice(); },
     _persistHistory() { H.storage.set(H.STORAGE.HISTORY, this._history); },
@@ -1631,6 +1815,7 @@
     _streamPending: '',
     _suppressing: false,
     _streamBubble: null,
+    _thinkingBubble: null,
     _previewedCardId: null,   // which card the settings panel is showing
     _draftPortrait: null,     // portrait held in memory for a new/unsaved card
     _isDraftMode: false,      // true after clicking New, until Save or Load
@@ -1674,9 +1859,6 @@
       this._els.input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this._onSend(); }
       });
-      this._els.regenerate.addEventListener('click', () => H.TurnController.regenerate());
-      this._els.debugToggle.addEventListener('click', () => H.DebugPanel.toggle());
-
       this._els.regenerate.addEventListener('click', () => H.TurnController.regenerate());
       this._els.debugToggle.addEventListener('click', () => H.DebugPanel.toggle());
 
@@ -1935,6 +2117,25 @@
       return div;
     },
 
+    showThinking(label) {
+      if (this._thinkingBubble) {
+        this._thinkingBubble.textContent = label || 'thinking…';
+        return;
+      }
+      const el = document.createElement('div');
+      el.className = 'msg thinking';
+      el.textContent = label || 'thinking…';
+      this._els.chat.appendChild(el);
+      this._thinkingBubble = el;
+      this._maybeScrollToBottom();
+    },
+
+    hideThinking() {
+      if (!this._thinkingBubble) return;
+      this._thinkingBubble.remove();
+      this._thinkingBubble = null;
+    },
+
     beginAssistantStream() {
       this._streamVisible = '';
       this._streamPending = '';
@@ -2156,17 +2357,6 @@
       H.CharacterCardLoader.deletePortraitForId(id);
       if (id === H.CharacterCardLoader.getActiveId()) this.renderPortrait();
       this._renderSettings();
-    },
-
-    _openPreviewPortraitPicker() {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.onchange = (e) => {
-        const f = e.target.files && e.target.files[0];
-        if (f) this._setPreviewPortrait(f);
-      };
-      input.click();
     },
 
         _openPreviewPortraitPicker() {
@@ -2685,6 +2875,7 @@
         ['Loop check',       'loopCheckEnabled',    'checkbox', null],
         ['Compaction',       'compactionEnabled',   'checkbox', null],
         ['State classifier', 'stateClassifierEnabled', 'checkbox', null],
+        ['Planning pass',    'planningEnabled',     'checkbox', null],
 
         ['Load-time — change triggers model reload', '__perf__', 'divider', null],
         ['Context window',   'nCtx',                'number', { step: 128, min: 512, max: 2048 }],
