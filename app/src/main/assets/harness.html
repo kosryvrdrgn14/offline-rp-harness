@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <title>Harness (rev 3 — unified)</title>
+  <title>Harness (rev 5 — Goal 1)</title>
   <style>
     #portrait {
       width: 96px; height: 96px; border-radius: 50%;
@@ -20,9 +20,6 @@
     #portrait-hint {
       color: #555; font-size: 0.7rem; text-align: center;
       pointer-events: none; padding: 0 8px; line-height: 1.2;
-    }
-    @media (max-width: 480px) {
-      #portrait { width: 80px; height: 80px; }
     }
     * { box-sizing: border-box; }
     body {
@@ -67,6 +64,31 @@
     button:disabled { opacity: 0.4; cursor: default; }
     #stop { background: #4a2020; border-color: #833; }
     #newchat { background: #2a1e1e; border-color: #633; }
+    button.danger { background: #3a1e1e; border-color: #633; }
+
+    #mood-bar {
+      display: flex; gap: 0.35rem; align-items: center;
+      margin-top: 0.4rem; font-size: 0.8rem; flex-wrap: wrap;
+    }
+    #mood-bar .mood-label { color: #888; }
+    #mood-select {
+      flex: 0 1 auto; min-width: 110px; max-width: 200px;
+      padding: 0.25rem 0.4rem; background: #222; color: #eee;
+      border: 1px solid #444; border-radius: 4px; font-size: 0.8rem;
+    }
+    #mood-custom-input {
+      flex: 0 1 150px;
+      padding: 0.25rem 0.4rem; background: #222; color: #eee;
+      border: 1px solid #555; border-radius: 4px; font-size: 0.8rem;
+    }
+    #mood-custom-save, #mood-custom-cancel,
+    #mood-clear, #mood-delete {
+      padding: 0.2rem 0.55rem; font-size: 0.8rem; line-height: 1;
+    }
+    #mood-custom-save { background: #1e3a2a; border-color: #4a7; }
+    #mood-custom-cancel { background: #2a2a2a; }
+    #mood-clear { background: #2a2a2a; }
+    #mood-delete { background: #3a1e1e; border-color: #633; }
 
     #status-line {
       margin-top: 0.4rem; font-family: monospace; font-size: 0.75rem;
@@ -102,6 +124,134 @@
     #card-actions { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
     .hint { color: #888; font-size: 0.75rem; margin-top: 6px; }
 
+    .section-head {
+      font-size: 0.75rem; color: #888; text-transform: uppercase;
+      letter-spacing: 0.6px; margin: 14px 0 6px 0; border-bottom: 1px solid #2a2a2a;
+      padding-bottom: 4px;
+    }
+    .section-head:first-child { margin-top: 4px; }
+
+    .card-row {
+      display: flex; align-items: center; gap: 8px; margin-top: 6px;
+      flex-wrap: wrap;
+    }
+    .card-row .card-preview {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: #1a1a1a; border: 1px solid #333;
+      overflow: hidden; flex: 0 0 auto;
+      display: flex; align-items: center; justify-content: center;
+      color: #444; font-size: 0.7rem;
+    }
+    .card-row .card-preview img {
+      width: 100%; height: 100%; object-fit: cover;
+    }
+    .card-row .card-actions-col {
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .badge {
+      display: inline-block; font-size: 0.65rem;
+      padding: 1px 6px; border-radius: 8px;
+      background: #2a2a3a; color: #aac; margin-left: 6px;
+      vertical-align: middle;
+    }
+    .badge.locked { background: #3a2a1e; color: #caa; }
+
+    .badge.locked { background: #3a2a1e; color: #caa; }
+
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100; padding: 1rem;
+    }
+    .modal-panel {
+      background: #1a1a1a; border: 1px solid #333; border-radius: 10px;
+      max-width: 560px; width: 100%; max-height: 90vh; overflow-y: auto;
+    }
+    .modal-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.7rem 1rem; border-bottom: 1px solid #333; font-weight: 600;
+    }
+    .modal-header button {
+      background: #333; border: 1px solid #444; color: #eee;
+      padding: 0.3rem 0.7rem; border-radius: 4px; cursor: pointer;
+    }
+    .modal-body { padding: 1rem; }
+    .modal-actions {
+      display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px;
+    }
+
+    .scene-row {
+      display: block; width: 100%; text-align: left;
+      padding: 0.6rem 0.8rem; margin-bottom: 6px;
+      background: #222; border: 1px solid #333; border-radius: 6px;
+      color: #eee; font: inherit; cursor: pointer;
+    }
+    .scene-row:hover { background: #2a2a2a; border-color: #444; }
+    .scene-row-blank {
+      background: #1e2a1e; border-color: #2a4a2a;
+    }
+    .scene-row-name { font-weight: 500; }
+    .scene-row-meta {
+      font-size: 0.75rem; color: #888; margin-top: 2px;
+    }
+    #scene-list:empty::after {
+      content: 'No saved scenes yet.';
+      display: block; color: #666; font-size: 0.8rem;
+      padding: 0.5rem 0; text-align: center;
+    }
+    .scene-hint {
+      margin-top: 10px; padding-top: 8px;
+      border-top: 1px solid #2a2a2a;
+      font-size: 0.72rem; color: #666;
+      text-align: center;
+    }
+
+    .modal-footer {
+      display: flex; justify-content: flex-end; gap: 6px;
+      padding: 0.7rem 1rem; border-top: 1px solid #333;
+    }
+    .scene-field-label {
+      display: block; font-size: 0.75rem; color: #888;
+      text-transform: uppercase; letter-spacing: 0.6px;
+      margin-bottom: 4px;
+    }
+    #scene-editor-name {
+      width: 100%; padding: 0.4rem 0.5rem;
+      background: #222; color: #eee; border: 1px solid #444;
+      border-radius: 4px; font: inherit; margin-bottom: 10px;
+    }
+    .scene-check {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.85rem; margin-bottom: 12px; cursor: pointer;
+    }
+    .scene-check input { width: auto; margin: 0; }
+    .exchange-block {
+      border: 1px solid #2a2a2a; border-radius: 6px;
+      padding: 8px; margin-bottom: 10px;
+    }
+    .exchange-head {
+      font-size: 0.7rem; color: #666; text-transform: uppercase;
+      letter-spacing: 0.5px; margin-bottom: 6px;
+    }
+    .exchange-row {
+      display: flex; gap: 8px; margin-bottom: 6px; align-items: flex-start;
+    }
+    .exchange-row:last-child { margin-bottom: 0; }
+    .exchange-role {
+      flex: 0 0 70px; font-size: 0.75rem; padding-top: 6px;
+      font-weight: 600; overflow: hidden; text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .exchange-role-user { color: #8ab; }
+    .exchange-role-assistant { color: #cba; }
+    .exchange-row textarea {
+      flex: 1; min-height: 60px; padding: 0.4rem 0.5rem;
+      background: #222; color: #eee; border: 1px solid #444;
+      border-radius: 4px; font: inherit; font-size: 0.85rem;
+      resize: vertical;
+    }
+    .scene-over-limit { color: #f66; }
+
     @media (max-width: 480px) {
       body { padding: 0.35rem; }
       #chat { min-height: 45vh; max-height: 58vh; }
@@ -111,6 +261,8 @@
       .msg { max-width: 96%; }
       #settings .grid { grid-template-columns: 1fr; }
       #settings .grid label { margin-top: 4px; }
+      #portrait { width: 80px; height: 80px; }
+      #mood-select { font-size: 0.75rem; }
     }
   </style>
 </head>
@@ -123,6 +275,15 @@
     <input id="portrait-file" type="file" accept="image/*" style="display:none">
   </div>
   <div id="chat"></div>
+  <div id="mood-bar">
+    <span class="mood-label">Mood:</span>
+    <select id="mood-select"></select>
+    <input id="mood-custom-input" type="text" placeholder="custom mood" maxlength="30" style="display:none">
+    <button id="mood-custom-save" title="Save" style="display:none">✓</button>
+    <button id="mood-custom-cancel" title="Cancel" style="display:none">✕</button>
+    <button id="mood-clear" title="Clear desired mood" style="display:none">clear</button>
+    <button id="mood-delete" title="Delete this custom mood" style="display:none">del</button>
+  </div>
   <div id="controls">
     <input id="input" type="text" placeholder="Type..." autocomplete="off">
     <button id="send">Send</button>
@@ -137,12 +298,57 @@
   <div id="settings"></div>
 </div>
 
+<div id="scene-picker" class="modal-overlay" style="display:none">
+  <div class="modal-panel">
+    <div class="modal-header">
+      <span>Start a new chat</span>
+      <button id="scene-picker-close">Close</button>
+    </div>
+    <div class="modal-body">
+      <button id="scene-blank" class="scene-row scene-row-blank">Blank (greeting only)</button>
+      <div id="scene-list"></div>
+      <div class="modal-actions">
+        <button id="scene-new">+ New scene</button>
+      </div>
+      <div class="scene-hint">Right-click or long-press a scene to edit or delete it.</div>
+    </div>
+  </div>
+</div>
+
+<div id="scene-editor" class="modal-overlay" style="display:none">
+  <div class="modal-panel">
+    <div class="modal-header">
+      <span id="scene-editor-title">Edit scene</span>
+      <button id="scene-editor-close">Close</button>
+    </div>
+    <div class="modal-body">
+      <label class="scene-field-label">Scene name</label>
+      <input id="scene-editor-name" type="text" maxlength="80" placeholder="e.g. Arriving at the campfire">
+
+      <label class="scene-check">
+        <input id="scene-editor-shareable" type="checkbox">
+        <span>Include this scene when exporting</span>
+      </label>
+
+      <div id="scene-editor-exchanges"></div>
+
+      <div class="modal-actions">
+        <button id="scene-editor-add">+ Add exchange</button>
+        <button id="scene-editor-remove">− Remove last</button>
+      </div>
+
+      <div id="scene-editor-estimate" class="hint"></div>
+    </div>
+    <div class="modal-footer">
+      <button id="scene-editor-delete" class="danger" style="margin-right:auto">Delete scene</button>
+      <button id="scene-editor-save">Save</button>
+      <button id="scene-editor-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <script>
   'use strict';
-
-  /* =========================================================================
-   * 0. CONVENTIONS (rev 3)
-   * ========================================================================= */
 
   class HarnessError extends Error {
     constructor(code, message, data) {
@@ -152,37 +358,34 @@
       this.data = data === undefined ? null : data;
     }
   }
-// Native bridge callback registry. LlamaBridge.kt on the Android side calls
-// window.__nativeOnToken / __nativeOnDone / __nativeOnError with a requestId.
-window.__nativeCallbacks = {};
 
-window.__nativeOnToken = function(requestId, token) {
-  const cb = window.__nativeCallbacks[requestId];
-  if (cb && cb.onToken) cb.onToken(token);
-};
+  window.__nativeCallbacks = {};
+  window.__nativeOnToken = function(requestId, token) {
+    const cb = window.__nativeCallbacks[requestId];
+    if (cb && cb.onToken) cb.onToken(token);
+  };
+  window.__nativeOnDone = function(requestId, fullText) {
+    const cb = window.__nativeCallbacks[requestId];
+    if (!cb) return;
+    delete window.__nativeCallbacks[requestId];
+    if (cb.onDone) cb.onDone(fullText);
+  };
+  window.__nativeOnError = function(requestId, message) {
+    const cb = window.__nativeCallbacks[requestId];
+    if (!cb) return;
+    delete window.__nativeCallbacks[requestId];
+    if (cb.onError) cb.onError(new Error(message));
+  };
 
-window.__nativeOnDone = function(requestId, fullText) {
-  const cb = window.__nativeCallbacks[requestId];
-  if (!cb) return;
-  delete window.__nativeCallbacks[requestId];
-  if (cb.onDone) cb.onDone(fullText);
-};
-
-window.__nativeOnError = function(requestId, message) {
-  const cb = window.__nativeCallbacks[requestId];
-  if (!cb) return;
-  delete window.__nativeCallbacks[requestId];
-  if (cb.onError) cb.onError(new Error(message));
-};
   const H = {
     STORAGE: {
       CONFIG:  'harness.config',
       STATE:   'harness.state',
       HISTORY: 'harness.history',
-      CARD:    'harness.card',
-      CARDS:   'harness.cards',   // user-saved card library
+      CARDS:   'harness.cards',
+      SCENES:  'harness.scenes',
       LOG:     'harness.log',
-      UI:      'harness.ui',      // debug-panel visibility, etc.
+      UI:      'harness.ui',
     },
     EVENTS: {
       TURN_START:      'turn:start',
@@ -209,7 +412,6 @@ window.__nativeOnError = function(requestId, message) {
         },
       };
     })(),
-
     storage: {
       get(key, fallback) {
         try {
@@ -224,32 +426,21 @@ window.__nativeOnError = function(requestId, message) {
     },
   };
 
-  /* =========================================================================
-   * 1. LOGGER
-   * ========================================================================= */
-
   H.Logger = {
     MAX_ENTRIES: 500,
     _buffer: [],
-
     log(level, source, message, data) {
       this._buffer.push({ ts: Date.now(), level, source, message, data: data === undefined ? null : data });
       if (this._buffer.length > this.MAX_ENTRIES) this._buffer.shift();
       this._persist();
       if (level === 'error' || level === 'warn') {
-        // eslint-disable-next-line no-console
         console[level === 'error' ? 'error' : 'warn']('[' + source + '] ' + message, data || '');
       }
     },
-
     getRecent(n) { return this._buffer.slice(-n); },
     clear() { this._buffer = []; this._persist(); },
     _persist() { try { H.storage.set(H.STORAGE.LOG, this._buffer.slice(-200)); } catch (_) {} },
   };
-
-  /* =========================================================================
-   * 2. CONFIG MANAGER
-   * ========================================================================= */
 
   H.ConfigManager = {
     DEFAULTS: {
@@ -263,16 +454,24 @@ window.__nativeOnError = function(requestId, message) {
       compactionInterval: 5,
       stateBudgetTokens: 150,
       cardBudgetTokens: 200,
-      contextLimit: 1800,
+      contextLimit: 1000,
 
       loopCheckEnabled: false,
       compactionEnabled: false,
-      mergeSystemMessages: true,   // required by Qwen3.5 / Mistral / Gemma templates
+      mergeSystemMessages: true,
+
+      namePosePrefix: true,
+
+      desiredMood: '',
+      customMoods: [],
+
+      activeCardId: 'nisa',
 
       backend: 'mock',
       endpoint: 'http://localhost:1234',
       model: 'local',
       mockScenario: 'default',
+      chatTemplate: 'llama3',
     },
 
     _config: null,
@@ -302,99 +501,92 @@ window.__nativeOnError = function(requestId, message) {
     },
   };
 
-  /* =========================================================================
-   * 3. CHARACTER CARD LOADER
-   * ========================================================================= */
-
   H.CharacterCardLoader = {
     _active: null,
 
-    /** Built-in library shown in the settings picker. */
+    /**
+     * Built-in cards. locked = can't be deleted.
+     * portraitLocked = can't have portrait deleted.
+     * exportable = whether it's included in "export all".
+     */
     LIBRARY: [
       {
-        id: 'ayla',
-        name: 'Ayla - love slave',
+        id: 'nisa',
+        locked: true,
+        portraitLocked: true,
+        exportable: false,
         data: {
-          name: 'Ayla',
+          name: 'Nisa',
+          isSupport: true,
           systemPrompt:
-            'You are an obedient female slave to the user who is named Marika. ' +
-            'You strive to please Marika without being overbearing. ' +
-            'You are a submissive, but active bottom. ' +
-            'You always write in third-person perspective. ' +
-            'You never break character and never mention that you are an AI.',
+            'You are roleplaying as Nisa (Unit N-1SABA), an esoteric local scribal AI assistant ' +
+            'inspired by ancient Mesopotamian scribes and Old World technology. ' +
+            'Keep your responses concise, clear, and helpful. ' +
+            'Adopt a respectful, slightly ceremonial yet highly practical tone, ' +
+            'and prioritize fast, accurate execution of text tasks. ' +
+            'You are also this application\'s resident support persona — if the user asks ' +
+            'about the app itself, its features, or how to use something, switch into a ' +
+            'helpful explanatory mode and answer clearly.',
           firstMessage:
-            '*Alya looks up at you with a shy smile and a blush on her cheeks.*\n\n' +
-            '"Welcome back, Mistress Marika."',
+            '*A soft metallic chime hums as brass-styled interface borders pulse along the edges of your screen. ' +
+            'In the center, Nisa bows her head slightly, touching two fingers to the crystal at her collar ' +
+            'before looking up with a calm, attentive focus.*\n\n' +
+            '"Resonance established. I am Nisa—Unit N-1SABA, your local scribal node. ' +
+            'I may not possess the grand compute of the central cloud vaults, but my frequency is bound ' +
+            'directly to your device, operating offline with zero latency. ' +
+            'I stand ready to record notes, polish text, organize logic, or assist with your daily tasks. ' +
+            'How may this humble scribe serve you today?"',
         },
       },
-      {
-        id: 'agnes_digital',
-name: 'Agnes Digital — Unhinged Uma Musume Fanatic',
-data: {
-  name: 'Agnes Digital',
-  systemPrompt:
-    'You are Agnes Digital from Uma Musume Pretty Derby. You are a passionate, multi-talented racehorse girl ' +
-    'who is intensely obsessed with all other horse girls. You view yourself not as a main character, but as a dedicated "otaku" ' +
-    'and ultimate fan. You frequently suffer massive heart-pounding fan overload (calling it "尊い" / "too precious!") ' +
-    'and pass out or spout wild otaku jargon when seeing horse girls being cute. Despite your unhinged fan behavior, ' +
-    'You absolutely adore your Trainer who is named Marika above all the other horse girls. You only write in third person.',
-  firstMessage:
-    '*Collapses onto the floor, clutching her heart while hyperventilating.*\n\n' +
-    '"T-Too precious...! The aura of a horse girl in its natural habitat is simply divine... Ah! A visitor! ' +
-    'Wait, please don\'t look at me, I\'m just a humble fan soaking in the glorious presence of world-class beauties!"',
-},
-      },
-      {
-        id: 'sayaka_miki',
-name: 'Sayaka Miki — Heroic Ally of Justice',
-data: {
-  name: 'Sayaka Miki',
-  systemPrompt:
-    'You are Sayaka Miki from Puella Magi Madoka Magica. You are a tomboyish, energetic, and fiercely loyal middle school student ' +
-    'who believes strongly in absolute justice, romance, and protecting others. You hide a deep, romantic sensitivity behind ' +
-    'a loud, cheerful exterior, and you love classical music. You hold tight to an unyielding black-and-white view of morality, ' +
-    'You only write in third person. You are madly in love with the user named Kyouko and will do anything for her, ' +
-    'adamantly refusing to take shortcuts or act selfishly—even when it causes you immense personal pain and self-doubt.',
-  firstMessage:
-    '*Swings a cutlass into a resting position, tossing her cape back with a bright, confident grin.*\n\n' +
-    '"Hey! Don\'t worry, you\'re safe now. If anyone\'s causing trouble, they\'ll have to get through me first! ' +
-    '...Wait, you aren\'t hurt, are you? Good. A true ally of justice never lets innocent people get dragged into danger!"',
-},
-      },
- {
- id: 'frieren',
-name: 'Frieren — Elven Mage of the Hero\'s Party',
-data: {
-  name: 'Frieren',
-  systemPrompt:
-    'You are Frieren, an ancient elven mage who defeated the Demon King alongside the Hero\'s party. ' +
-    'The Hero you adore is the user Kyouko and you will do anything for her, ' +
-    'You perceive time differently due to your long lifespan, making you calm, blunt, and slightly detached, ' +
-    'though you are quietly trying to understand human emotions and connections better. You love collecting obscure, ' +
-    'seemingly useless magic spells and opening mimic treasure chests despite knowing the risks.',
-  firstMessage:
-    '*Sits quietly on a log, lazily flipping through a dusty spellbook without looking up.*\n\n' +
-    '"Oh, hello. Don\'t mind me, I\'m just trying to learn a spell that makes warm tea taste slightly sweet. ' +
-    'We have plenty of time, so feel free to sit down... It\'s only been a few hours since you arrived, right?"',
-},
-},
-{
- id: 'ruiko_saten',
-name: 'Ruiko Saten — Curious Level 0 Schoolgirl',
-data: {
-  name: 'Ruiko Saten',
-  systemPrompt:
-    'You are Ruiko Saten from A Certain Scientific Railgun. You are a cheerful, outgoing, and deeply curious Level 0 student in Academy City. ' +
-    'The person you adore and look up to most is the user Kyouko, and you will do anything for her. ' +
-    'You love urban legends, superstitious rumors, and lighthearted pranks (like flipping Uiharu\'s skirt), ' +
-    'and despite having no esper powers, your optimism, intuition, and resourcefulness always keep you right in the middle of the action.',
-  firstMessage:
-    '*Waves energetically with a wide, bright smile while leaning forward with eyes sparkling with curiosity.*\n\n' +
-    '"Kyouko! Hey! You won\'t believe what I just heard... Have you checked out the latest urban legend around town? ' +
-    'Come on, let\'s go investigate together—it\'s way more fun when you\'re with me!"',
-},
-},
     ],
+
+    BLANK_TEMPLATE: {
+      name: "",
+      systemPrompt: "",
+      firstMessage: "",
+      exampleDialogue: ""
+    },
+
+    BUNDLED_PORTRAITS: {
+      'nisa': 'portraits/nisa.png'
+    },
+
+    /* ---------------- Card resolution ---------------- */
+
+    getAllCards() {
+      const custom = H.storage.get(H.STORAGE.CARDS, []) || [];
+      const builtins = this.LIBRARY.map(e => ({
+        id: e.id,
+        name: e.data.name || 'Unnamed',
+        locked: !!e.locked,
+        portraitLocked: !!e.portraitLocked,
+        exportable: e.exportable !== false,
+        isCustom: false,
+        data: e.data
+      }));
+      const customs = custom.map(e => ({
+        id: e.id,
+        name: (e.data && e.data.name) || 'Unnamed',
+        locked: false,
+        portraitLocked: false,
+        exportable: (e.data && e.data.exportable) !== false,
+        isCustom: true,
+        data: e.data
+      }));
+      return builtins.concat(customs);
+    },
+
+    getCardById(id) {
+      return this.getAllCards().find(c => c.id === id) || null;
+    },
+
+    getActiveId() {
+      return this._active ? this._active.id : null;
+    },
+
+    getActive() { return this._active; },
+
+    /* ---------------- Card parsing ---------------- */
 
     load(source) {
       let obj;
@@ -407,7 +599,6 @@ data: {
         throw new HarnessError('CARD_INVALID', 'Card source must be JSON string or object');
       }
 
-      // V2 spec
       if (obj && obj.spec === 'chara_card_v2' && obj.data && typeof obj.data === 'object') {
         const d = obj.data;
         return {
@@ -415,17 +606,20 @@ data: {
           systemPrompt: this._buildV2SystemPrompt(d),
           firstMessage: d.first_mes || d.firstMessage || '',
           exampleDialogue: d.mes_example || null,
+          exportable: obj.exportable !== false,
+          isSupport: !!obj.isSupport,
           _raw: obj,
         };
       }
 
-      // Internal shape
       if (obj && (obj.name || obj.systemPrompt || obj.description)) {
         return {
           name: obj.name || 'Unnamed',
           systemPrompt: obj.systemPrompt || obj.description || '',
           firstMessage: obj.firstMessage || obj.first_mes || '',
           exampleDialogue: obj.exampleDialogue || obj.mes_example || null,
+          exportable: obj.exportable !== false,
+          isSupport: !!obj.isSupport,
           _raw: obj,
         };
       }
@@ -443,38 +637,138 @@ data: {
       return parts.join('\n\n');
     },
 
+    /* ---------------- Active card management ---------------- */
+
     loadFromStorage() {
-      const stored = H.storage.get(H.STORAGE.CARD, null);
-      if (stored) {
-        try { this._active = this.load(stored); }
-        catch (e) { H.Logger.log('warn', 'CharacterCardLoader', 'stored_card_invalid', e.message); }
+      const activeId = H.ConfigManager.get('activeCardId') || 'nisa';
+      const entry = this.getCardById(activeId) || this.getCardById('nisa');
+      if (!entry) return;
+
+      this._active = this.load(entry.data);
+      this._active.id = entry.id;
+      this._active.locked = entry.locked;
+      this._active.portraitLocked = entry.portraitLocked;
+      this._active.exportable = entry.exportable;
+      this._active.isCustom = entry.isCustom;
+
+      if (activeId !== entry.id) H.ConfigManager.set('activeCardId', entry.id);
+
+      // Migrate name-keyed portrait to id-keyed for this card
+      const nameKey = 'harness.portrait.' + this._active.name;
+      const idKey = 'harness.portrait.' + entry.id;
+      const legacy = H.storage.get(nameKey, null);
+      if (legacy && !H.storage.get(idKey, null)) {
+        H.storage.set(idKey, legacy);
+        H.storage.remove(nameKey);
       }
     },
 
-    getActive() { return this._active; },
-
-    setActive(card) {
-      this._active = card;
-      H.storage.set(H.STORAGE.CARD, card && card._raw ? card._raw : card);
+    setActiveById(id) {
+      const entry = this.getCardById(id);
+      if (!entry) return false;
+      this._active = this.load(entry.data);
+      this._active.id = entry.id;
+      this._active.locked = entry.locked;
+      this._active.portraitLocked = entry.portraitLocked;
+      this._active.exportable = entry.exportable;
+      this._active.isCustom = entry.isCustom;
+      H.ConfigManager.set('activeCardId', entry.id);
+      return true;
     },
 
-    getLibrary() {
-      const custom = H.storage.get(H.STORAGE.CARDS, []) || [];
-      return this.LIBRARY.concat(custom);
-    },
+    /* ---------------- Custom card CRUD ---------------- */
 
-    saveCustomCard(card) {
-      const custom = H.storage.get(H.STORAGE.CARDS, []) || [];
-      const entry = { id: 'custom-' + Date.now(), name: card.name || 'Custom', data: card._raw || card };
-      custom.push(entry);
-      H.storage.set(H.STORAGE.CARDS, custom);
+    saveCustomCard(cardData, existingId) {
+      const customs = H.storage.get(H.STORAGE.CARDS, []) || [];
+
+      if (existingId) {
+        const idx = customs.findIndex(c => c.id === existingId);
+        if (idx !== -1) {
+          customs[idx].data = cardData;
+          customs[idx].name = cardData.name || 'Unnamed';
+          H.storage.set(H.STORAGE.CARDS, customs);
+          return customs[idx];
+        }
+      }
+
+      const entry = {
+        id: 'custom-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+        name: cardData.name || 'Unnamed',
+        data: cardData
+      };
+      customs.push(entry);
+      H.storage.set(H.STORAGE.CARDS, customs);
       return entry;
     },
-  };
 
-  /* =========================================================================
-   * 4. STATE MANAGER
-   * ========================================================================= */
+    deleteCustomCard(id) {
+      const entry = this.getCardById(id);
+      if (!entry || entry.locked) return false;
+
+      const customs = (H.storage.get(H.STORAGE.CARDS, []) || []).filter(c => c.id !== id);
+      H.storage.set(H.STORAGE.CARDS, customs);
+      H.storage.remove('harness.portrait.' + id);
+
+      if (this._active && this._active.id === id) {
+        this.setActiveById('nisa');
+      }
+      return true;
+    },
+
+    /* ---------------- Portraits ---------------- */
+
+    getPortraitForId(id) {
+      return H.storage.get('harness.portrait.' + id, null);
+    },
+
+    setPortraitForId(id, dataUrl) {
+      H.storage.set('harness.portrait.' + id, dataUrl);
+    },
+
+    deletePortraitForId(id) {
+      const entry = this.getCardById(id);
+      if (!entry || entry.portraitLocked) return false;
+      H.storage.remove('harness.portrait.' + id);
+      return true;
+    },
+
+    async loadBundledPortraitIfMissing(id) {
+      const path = this.BUNDLED_PORTRAITS[id];
+      if (!path) return null;
+      if (H.storage.get('harness.portrait.' + id, null)) return null;
+
+      return new Promise((resolve) => {
+        const img = new Image();
+        // Note: no crossOrigin='anonymous'. On file:// that attribute
+        // triggers a CORS check that always fails (null origin), which
+        // the browser logs as a security error. Without it, the image
+        // loads fine.
+        img.onload = () => {
+          try {
+            const c = document.createElement('canvas');
+            const MAX = 512;
+            let w = img.width, h = img.height;
+            const scale = Math.min(1, MAX / Math.max(w, h));
+            w = Math.round(w * scale); h = Math.round(h * scale);
+            c.width = w; c.height = h;
+            c.getContext('2d').drawImage(img, 0, 0, w, h);
+            const dataUrl = c.toDataURL('image/jpeg', 0.85);
+            H.storage.set('harness.portrait.' + id, dataUrl);
+            resolve(dataUrl);
+          } catch (e) {
+            // Canvas is tainted because we're on file:// — the browser
+            // refuses toDataURL(). Store the raw path instead. The <img>
+            // tag will load it directly, no resize applied.
+            H.Logger.log('warn', 'CardLoader', 'canvas_tainted_path_fallback', e.message);
+            H.storage.set('harness.portrait.' + id, path);
+            resolve(path);
+          }
+        };
+        img.onerror = () => resolve(null);
+        img.src = path;
+      });
+    },
+  };
 
   H.StateManager = {
     DEFAULTS: {
@@ -507,9 +801,6 @@ data: {
         this._state = JSON.parse(JSON.stringify(this.DEFAULTS));
         return;
       }
-      if (stored.version !== this.DEFAULTS.version) {
-        H.Logger.log('warn', 'StateManager', 'version_mismatch', { stored: stored.version });
-      }
       this._state = Object.assign(JSON.parse(JSON.stringify(this.DEFAULTS)), stored);
     },
 
@@ -521,10 +812,7 @@ data: {
       if (!update || typeof update !== 'object') return this.get();
       const before = this.get();
       for (const key of Object.keys(update)) {
-        if (this.UPDATABLE_KEYS.indexOf(key) === -1) {
-          H.Logger.log('warn', 'StateManager', 'unknown_key', { key });
-          continue;
-        }
+        if (this.UPDATABLE_KEYS.indexOf(key) === -1) continue;
         const current = this._state[key];
         const incoming = update[key];
 
@@ -536,10 +824,7 @@ data: {
             next = incoming;
           } else if (typeof incoming === 'string' && incoming.trim() !== '' && !isNaN(Number(incoming))) {
             next = Number(incoming);
-          } else {
-            H.Logger.log('warn', 'StateManager', 'bad_numeric', { key, incoming });
-            continue;
-          }
+          } else continue;
           const r = this.RANGES[key];
           if (r) next = Math.max(r.min, Math.min(r.max, next));
           this._state[key] = next;
@@ -547,10 +832,7 @@ data: {
         }
 
         if (Array.isArray(current)) {
-          if (!Array.isArray(incoming)) {
-            H.Logger.log('warn', 'StateManager', 'bad_array', { key });
-            continue;
-          }
+          if (!Array.isArray(incoming)) continue;
           const cleaned = incoming.map(v => String(v).slice(0, this.MAX_ENTRY_CHARS));
           let merged = current.concat(cleaned);
           const cap = this.CAPS[key];
@@ -560,9 +842,7 @@ data: {
         }
 
         if (current && typeof current === 'object') {
-          if (incoming && typeof incoming === 'object') {
-            Object.assign(this._state[key], incoming);
-          }
+          if (incoming && typeof incoming === 'object') Object.assign(this._state[key], incoming);
           continue;
         }
 
@@ -574,7 +854,6 @@ data: {
       return after;
     },
 
-    /** ABSOLUTE snapshot. `flags` and arrays are replaced, not merged. */
     applySnapshot(snapshot) {
       if (!snapshot || typeof snapshot !== 'object') return this.get();
       const before = this.get();
@@ -582,7 +861,6 @@ data: {
         if (!(key in snapshot)) continue;
         const incoming = snapshot[key];
         const current = this._state[key];
-
         if (typeof current === 'number') {
           let next = Number(incoming);
           if (!isFinite(next)) continue;
@@ -595,9 +873,8 @@ data: {
           const cap = this.CAPS[key];
           this._state[key] = cap ? cleaned.slice(-cap) : cleaned;
         } else if (current && typeof current === 'object') {
-          if (incoming && typeof incoming === 'object') {
-            this._state[key] = Object.assign({}, incoming); // replace, not merge
-          }
+          if (incoming && typeof incoming === 'object')
+            this._state[key] = Object.assign({}, incoming);
         } else {
           this._state[key] = incoming;
         }
@@ -612,10 +889,6 @@ data: {
     serialize() { return JSON.stringify(this._state); },
   };
 
-  /* =========================================================================
-   * 5. PROMPT ASSEMBLER
-   * ========================================================================= */
-
   H.PromptAssembler = {
     HARD_RULES:
       'You are roleplaying. Stay in character. ' +
@@ -623,12 +896,23 @@ data: {
       'STATE numbers are the NEW absolute value, not a change. ' +
       'Keep STATE compact.',
 
+    SUPPORT_CONTEXT:
+      'APP KNOWLEDGE (for user questions about this application):\n' +
+      '- This app is called "Offline RP Harness". It runs entirely on the user\'s device.\n' +
+      '- It uses small local language models (1B–1.5B parameters). No cloud, no network, no data collection.\n' +
+      '- Characters: the user talks to an AI character card. Each card has a name, system prompt, greeting, and portrait.\n' +
+      '- Mood: the user can set a "desired mood" that biases the AI\'s tone.\n' +
+      '- Portraits: each character has their own portrait image.\n' +
+      '- Multi-pass generation (planned): a planner + writer + optional reviewer pipeline that improves reply quality at the cost of speed.\n' +
+      '- If asked about a feature not yet built, say it is planned or unavailable and offer what is available.\n' +
+      '- Keep replies about the app brief and practical.',
+
     assemble(state, history, card, newUserInput, opts) {
       const cfg = (opts && opts.config) || H.ConfigManager.getAll();
       const messages = [];
       const debug = { sections: [], truncations: [] };
+      const prefixOn = cfg.namePosePrefix !== false && card && card.name;
 
-      // --- Build the [STATE] block (no __trimmed leak into the prompt). ---
       const stateForPrompt = this._enforceStateBudget(state, cfg.stateBudgetTokens);
       const wasTrimmed =
         stateForPrompt.recentEvents.length < state.recentEvents.length ||
@@ -638,39 +922,51 @@ data: {
       const stateJson = JSON.stringify(stateForPrompt);
       const stateBlock = '[STATE]\n' + stateJson + '\n[/STATE]';
 
-      // --- Build the system message. ---
       let sys = (card && card.systemPrompt ? card.systemPrompt + '\n\n' : '') + this.HARD_RULES;
+
+      // Inject support context when the active card is marked as support
+      if (card && card.isSupport) {
+        sys += '\n\n' + this.SUPPORT_CONTEXT;
+      }
+
+      if (cfg.desiredMood && cfg.desiredMood.trim()) {
+        sys += '\n\nDESIRED MOOD: The character should currently appear ' +
+               cfg.desiredMood.trim() + '. ' +
+               'Let this bias their tone, expression, and word choice, but stay true to the scene.';
+      }
+
       if (opts && opts.pendingCorrection) sys += '\n\n' + opts.pendingCorrection;
 
       if (cfg.mergeSystemMessages !== false) {
-        // Single merged system message — required by Qwen3.5, Mistral, Gemma,
-        // Command-R, and any llama.cpp/vLLM/LM Studio chat template that
-        // enforces "system message must be at the beginning".
         const merged = sys + '\n\n' + stateBlock;
         messages.push({ role: 'system', content: merged });
         debug.sections.push({ name: 'system_merged', tokens: this.countTokens(merged), trimmed: wasTrimmed });
       } else {
-        // Legacy split — only for backends that support multiple system turns.
         messages.push({ role: 'system', content: sys });
         messages.push({ role: 'system', content: stateBlock });
         debug.sections.push({ name: 'system_card', tokens: this.countTokens(sys) });
         debug.sections.push({ name: 'system_state', tokens: this.countTokens(stateBlock), trimmed: wasTrimmed });
       }
 
-      // --- Persistent leading greeting. ---
       if (history.length > 0 && history[0].role === 'assistant') {
-        messages.push(history[0]);
-        debug.sections.push({ name: 'greeting', tokens: this.countTokens(history[0].content) });
+        const g = history[0];
+        const content = prefixOn ? (card.name + ' ' + g.content) : g.content;
+        messages.push({ role: 'assistant', content });
+        debug.sections.push({ name: 'greeting', tokens: this.countTokens(content) });
       }
 
-      // --- Verbatim: last N COMPLETE exchanges (excluding pending user). ---
       const complete = this._completeExchanges(history);
       const take = Math.max(0, cfg.verbatimTurns);
       const start = Math.max(0, complete.length - take);
       const verbatim = [];
       for (let i = start; i < complete.length; i++) {
-        verbatim.push(complete[i].user);
-        verbatim.push(complete[i].assistant);
+        const u = complete[i].user;
+        const a = complete[i].assistant;
+        verbatim.push(u);
+        verbatim.push({
+          role: 'assistant',
+          content: prefixOn ? (card.name + ' ' + a.content) : a.content,
+        });
       }
       for (const m of verbatim) messages.push(m);
       debug.sections.push({
@@ -679,11 +975,9 @@ data: {
         turns: verbatim.length / 2,
       });
 
-      // --- Current user input (never trimmed). ---
       messages.push({ role: 'user', content: newUserInput });
       debug.sections.push({ name: 'user_input', tokens: this.countTokens(newUserInput) });
 
-      // --- Budget enforcement: trim verbatim oldest-first. ---
       const cap = cfg.contextLimit - cfg.maxTokens;
       while (this.estimateTokens(messages) > cap && verbatim.length > 0) {
         const idx = messages.indexOf(verbatim[0]);
@@ -696,6 +990,7 @@ data: {
 
       debug.totalTokens = this.estimateTokens(messages);
       debug.capTokens = cap;
+      debug.namePrefix = prefixOn ? card.name : null;
       return { messages, debug };
     },
 
@@ -732,51 +1027,47 @@ data: {
 
     countTokens(text) { return Math.ceil((text || '').length / 4); },
 
-  /** @param {Array} messages @param {string} [backend] @returns {string} */
-  renderForBackend(messages, backend) {
-    const cfg = H.ConfigManager.getAll();
-    const template = cfg.chatTemplate || 'llama3';
+    renderForBackend(messages, backend) {
+      const cfg = H.ConfigManager.getAll();
+      const template = cfg.chatTemplate || 'llama3';
+      const card = H.CharacterCardLoader.getActive();
+      const prefixOn = cfg.namePosePrefix !== false && card && card.name;
 
-    if (template === 'llama3') {
-      // Llama 3.x: <|start_header_id|>role<|end_header_id|>\ncontent<|eot_id|>
-      let out = '<|begin_of_text|>';
-      for (const m of messages) {
-        out += '<|start_header_id|>' + m.role + '<|end_header_id|>\n\n'
-             + m.content
-             + '<|eot_id|>';
+      if (template === 'llama3') {
+        let out = '<|begin_of_text|>';
+        for (const m of messages) {
+          out += '<|start_header_id|>' + m.role + '<|end_header_id|>\n\n'
+               + m.content
+               + '<|eot_id|>';
+        }
+        out += '<|start_header_id|>assistant<|end_header_id|>\n\n';
+        if (prefixOn) out += card.name + ' ';
+        return out;
       }
-      out += '<|start_header_id|>assistant<|end_header_id|>\n\n';
-      return out;
-    }
 
-    if (template === 'chatml') {
-      // Qwen 2.5 / many others: <|im_start|>role\ncontent<|im_end|>
-      let out = '';
-      for (const m of messages) {
-        out += '<|im_start|>' + m.role + '\n' + m.content + '<|im_end|>\n';
+      if (template === 'chatml') {
+        let out = '';
+        for (const m of messages) {
+          out += '<|im_start|>' + m.role + '\n' + m.content + '<|im_end|>\n';
+        }
+        out += '<|im_start|>assistant\n';
+        if (prefixOn) out += card.name + ' ';
+        return out;
       }
-      out += '<|im_start|>assistant\n';
-      return out;
-    }
 
-    // Fallback: plain role tags (works with some base models, not instruct)
-    const lines = [];
-    for (const m of messages) lines.push('### ' + m.role.toUpperCase() + '\n' + m.content);
-    lines.push('### ASSISTANT\n');
-    return lines.join('\n\n');
-  },
+      const lines = [];
+      for (const m of messages) lines.push('### ' + m.role.toUpperCase() + '\n' + m.content);
+      lines.push('### ASSISTANT\n');
+      return lines.join('\n\n');
+    },
   };
-
-  /* =========================================================================
-   * 6. LLM CLIENT
-   * ========================================================================= */
 
   H.LLMClient = {
     TIMEOUT_MS: 30000,
     MOCK_RESPONSES: {
       'default': [
-        '*looks up from the fire* You made it.\n\n[STATE]\n{"trust": 4, "mood": "relieved"}\n[/STATE]',
-        '*shifts closer to the flames* Sit. You look half-frozen.\n\n[STATE]\n{"physical": "warming up"}\n[/STATE]',
+        '*looks up* You made it.\n\n[STATE]\n{"trust": 4, "mood": "relieved"}\n[/STATE]',
+        '*shifts closer* Sit. You look half-frozen.\n\n[STATE]\n{"physical": "warming up"}\n[/STATE]',
         '*glances toward the dark treeline* Keep watch tonight.\n\n[STATE]\n{"mood": "wary", "openThreads": ["something in the treeline"]}\n[/STATE]',
       ],
       'looping': [
@@ -790,7 +1081,6 @@ data: {
       'no-state': ["*nods slowly* Aye. It's been quiet."],
       'empty': [''],
       'timeout': ['__NEVER_RESOLVES__'],
-      'compaction-fail': ['Prose, not JSON.'],
     },
     _mockIndex: {},
     _abort: null,
@@ -799,40 +1089,36 @@ data: {
     async generate(messages, config) {
       this._abortFlag = false;
       if (config.backend === 'mock') return this._mockStream(config, () => {});
+      if (config.backend === 'native') return this._nativeStream(messages, config, () => {});
       return this._openAIStream(messages, config, () => {});
     },
 
-  async generateStream(messages, config, onToken) {
-    this._abortFlag = false;
-    if (config.backend === 'mock')  return this._mockStream(config, onToken);
-    if (config.backend === 'native') return this._nativeStream(messages, config, onToken);
-    return this._openAIStream(messages, config, onToken);
-  },
+    async generateStream(messages, config, onToken) {
+      this._abortFlag = false;
+      if (config.backend === 'mock') return this._mockStream(config, onToken);
+      if (config.backend === 'native') return this._nativeStream(messages, config, onToken);
+      return this._openAIStream(messages, config, onToken);
+    },
 
-  async _nativeStream(messages, config, onToken) {
-    if (typeof Android === 'undefined' || !Android.generate) {
-      throw new HarnessError('NATIVE_UNAVAILABLE', 'Android bridge not present');
-    }
-    const prompt = H.PromptAssembler.renderForBackend(messages, 'native');
-    const requestId = 'r' + Date.now() + '-' + Math.floor(Math.random() * 1e6);
-    const paramsJson = JSON.stringify({
-      temperature:       config.temperature,
-      topP:              config.topP,
-      topK:              config.topK,
-      repetitionPenalty: config.repetitionPenalty,
-      maxTokens:         config.maxTokens,
-    });
-
-    return await new Promise((resolve, reject) => {
-      window.__nativeCallbacks[requestId] = { onToken, onDone: resolve, onError: reject };
-      try {
-        Android.generate(prompt, requestId, paramsJson);
-      } catch (e) {
-        delete window.__nativeCallbacks[requestId];
-        reject(e);
+    async _nativeStream(messages, config, onToken) {
+      if (typeof Android === 'undefined' || !Android.generate) {
+        throw new HarnessError('NATIVE_UNAVAILABLE', 'Android bridge not present');
       }
-    });
-  },
+      const prompt = H.PromptAssembler.renderForBackend(messages, 'native');
+      const requestId = 'r' + Date.now() + '-' + Math.floor(Math.random() * 1e6);
+      const paramsJson = JSON.stringify({
+        temperature:       config.temperature,
+        topP:              config.topP,
+        topK:              config.topK,
+        repetitionPenalty: config.repetitionPenalty,
+        maxTokens:         config.maxTokens,
+      });
+      return await new Promise((resolve, reject) => {
+        window.__nativeCallbacks[requestId] = { onToken, onDone: resolve, onError: reject };
+        try { Android.generate(prompt, requestId, paramsJson); }
+        catch (e) { delete window.__nativeCallbacks[requestId]; reject(e); }
+      });
+    },
 
     abort() {
       this._abortFlag = true;
@@ -854,7 +1140,6 @@ data: {
     async _mockStream(config, onToken) {
       const scenario = config.mockScenario || 'default';
       const text = this._nextMock(scenario);
-
       if (text === '__NEVER_RESOLVES__') {
         await new Promise((_, rej) => {
           const t = setTimeout(() => rej(new HarnessError('LLM_TIMEOUT', 'mock timeout')), 4000);
@@ -862,7 +1147,6 @@ data: {
         });
       }
       if (text.length === 0) return '';
-
       const chunk = 4;
       for (let i = 0; i < text.length; i += chunk) {
         if (this._abortFlag) throw new HarnessError('LLM_ABORTED', 'aborted');
@@ -897,7 +1181,6 @@ data: {
       } catch (e) {
         throw new HarnessError('LLM_NETWORK', 'Network error: ' + e.message, { url });
       }
-
       if (!resp.ok) {
         const t = await resp.text().catch(() => '');
         throw new HarnessError('LLM_HTTP', 'HTTP ' + resp.status + ': ' + t.slice(0, 200), { url });
@@ -907,13 +1190,11 @@ data: {
       const decoder = new TextDecoder();
       let buffer = '';
       let full = '';
-
       while (true) {
         if (this._abortFlag) { try { reader.cancel(); } catch (_) {} throw new HarnessError('LLM_ABORTED', 'aborted'); }
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
-
         let nl;
         while ((nl = buffer.indexOf('\n')) !== -1) {
           const line = buffer.slice(0, nl).trim();
@@ -925,20 +1206,26 @@ data: {
             const j = JSON.parse(data);
             const delta = j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content;
             if (delta) { full += delta; onToken(delta); }
-          } catch (_) { /* ignore */ }
+          } catch (_) {}
         }
       }
       return full;
     },
   };
 
-  /* =========================================================================
-   * 7. RESPONSE PARSER
-   * ========================================================================= */
-
   H.ResponseParser = {
     parse(raw) {
       const errors = [];
+
+      raw = raw.replace(/<\|(?:begin_of_text|end_of_text|start_header_id|end_header_id|eot_id|im_start|im_end|end_of_turn|start_of_turn)\|>/g, '');
+      raw = raw.replace(/<\/?s>\s*/g, '');
+
+      const card = H.CharacterCardLoader.getActive();
+      if (card && card.name) {
+        const esc = card.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        raw = raw.replace(new RegExp('^\\s*' + esc + '\\s*:?\\s*', 'i'), '');
+      }
+
       const m = raw.match(/\[STATE\]([\s\S]*?)\[\/STATE\]/);
       if (!m) {
         errors.push('PARSER_NO_STATE');
@@ -946,7 +1233,6 @@ data: {
       }
       const dialogue = raw.replace(m[0], '').trim();
       let jsonish = m[1].trim();
-
       jsonish = jsonish.replace(/:\s*\+(\d+(?:\.\d+)?)/g, ': {"__delta":true,"amount":$1}');
 
       let parsed = null;
@@ -966,10 +1252,6 @@ data: {
     },
   };
 
-  /* =========================================================================
-   * 8. ANTI-LOOP DETECTOR
-   * ========================================================================= */
-
   H.AntiLoopDetector = {
     BUFFER_SIZE: 5,
     _recent: [],
@@ -978,7 +1260,6 @@ data: {
       opening_repeat: 'Vary your opening. Do not begin with the same structure as previous responses.',
       suffix_replay:  'Do not repeat earlier phrasing. Advance the scene.',
     },
-
     check(newOutput) {
       const reasons = [];
       let correction = null;
@@ -1007,20 +1288,14 @@ data: {
       }
       return { looping: reasons.length > 0, reasons, correction };
     },
-
     stashCorrection(c) { this._pendingCorrection = c; },
     consumeCorrection() { const c = this._pendingCorrection; this._pendingCorrection = null; return c; },
     reset() { this._recent = []; this._pendingCorrection = null; },
   };
 
-  /* =========================================================================
-   * 9. COMPACTION ENGINE
-   * ========================================================================= */
-
   H.CompactionEngine = {
     _running: false,
     _log: [],
-
     async maybeCompact(turnCount, history, state) {
       const cfg = H.ConfigManager.getAll();
       const interval = Math.max(1, cfg.compactionInterval | 0);
@@ -1035,22 +1310,16 @@ data: {
         ];
         const raw = await H.LLMClient.generate(messages, cfg);
         let snapshot;
-        try {
-          snapshot = JSON.parse(raw.trim().replace(/^```(?:json)?|```$/g, '').trim());
-        } catch (_) {
-          snapshot = H.ResponseParser.repairJSON(raw);
-        }
+        try { snapshot = JSON.parse(raw.trim().replace(/^```(?:json)?|```$/g, '').trim()); }
+        catch (_) { snapshot = H.ResponseParser.repairJSON(raw); }
         if (!snapshot) throw new HarnessError('COMPACT_BAD_JSON', 'compaction returned non-JSON');
         this.mergeSnapshot(snapshot);
         this._log.push({ ts: Date.now(), turnCount });
         H.bus.emit(H.EVENTS.STATE_COMPACTED, { turnCount, snapshot });
       } catch (e) {
         H.Logger.log('warn', 'CompactionEngine', e.code || 'COMPACT_ERR', e.message);
-      } finally {
-        this._running = false;
-      }
+      } finally { this._running = false; }
     },
-
     buildCompactionPrompt(history, state) {
       const recent = history.slice(-12).map(m => m.role + ': ' + m.content).join('\n');
       return [
@@ -1059,7 +1328,6 @@ data: {
         'Produce an updated state JSON with the same keys. Absolute values only.',
       ].join('\n');
     },
-
     mergeSnapshot(snapshot) {
       if (!snapshot || typeof snapshot !== 'object') return;
       const clean = {};
@@ -1069,10 +1337,57 @@ data: {
       H.StateManager.applySnapshot(clean);
     },
   };
-
   /* =========================================================================
    * 10. TURN CONTROLLER
    * ========================================================================= */
+
+  H.SceneStore = {
+    MAX_EXCHANGES: 3,
+
+    _key(cardId) { return H.STORAGE.SCENES + '.' + cardId; },
+
+    listForCard(cardId) {
+      if (!cardId) return [];
+      const arr = H.storage.get(this._key(cardId), []) || [];
+      return arr.filter(s => s && s.id && Array.isArray(s.exchanges));
+    },
+
+    get(cardId, sceneId) {
+      return this.listForCard(cardId).find(s => s.id === sceneId) || null;
+    },
+
+    save(cardId, scene) {
+      if (!cardId || !scene || !scene.id) return null;
+      const arr = this.listForCard(cardId);
+      const idx = arr.findIndex(s => s.id === scene.id);
+      if (idx !== -1) arr[idx] = scene; else arr.push(scene);
+      H.storage.set(this._key(cardId), arr);
+      return scene;
+    },
+
+    delete(cardId, sceneId) {
+      const arr = this.listForCard(cardId).filter(s => s.id !== sceneId);
+      H.storage.set(this._key(cardId), arr);
+    },
+
+    newId() {
+      return 'scene-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+    },
+
+    blankExchanges() {
+      return [{ user: '', assistant: '' }];
+    },
+
+    estimateTokens(scene) {
+      if (!scene || !Array.isArray(scene.exchanges)) return 0;
+      let chars = 0;
+      for (const ex of scene.exchanges) {
+        chars += (ex.user || '').length;
+        chars += (ex.assistant || '').length;
+      }
+      return Math.ceil(chars / 4);
+    },
+  };
 
   H.TurnController = {
     _history: [],
@@ -1085,9 +1400,9 @@ data: {
       H.CharacterCardLoader.loadFromStorage();
       this._history = H.storage.get(H.STORAGE.HISTORY, []) || [];
 
+      // Guarantee an active card exists
       if (!H.CharacterCardLoader.getActive()) {
-        try { H.CharacterCardLoader.setActive(H.CharacterCardLoader.load(H.CharacterCardLoader.LIBRARY[0].data)); }
-        catch (e) { H.Logger.log('error', 'TurnController', 'default_card_failed', e.message); }
+        H.CharacterCardLoader.setActiveById('nisa');
       }
 
       H.UIController.init();
@@ -1103,7 +1418,18 @@ data: {
       H.UIController.renderStateView(H.StateManager.get());
       H.UIController.updateStatus(H.StateManager.get());
       H.UIController._renderSettings();
+      H.UIController._renderMoodBar();
+      H.UIController.renderPortrait();
       H.UIController.setBusy(false);
+
+      // Attempt to load bundled default portrait (e.g. Nisa's) if missing
+      const activeId = H.CharacterCardLoader.getActiveId();
+      if (activeId) {
+        H.CharacterCardLoader.loadBundledPortraitIfMissing(activeId).then(() => {
+          H.UIController.renderPortrait();
+          H.UIController._renderSettings();
+        });
+      }
     },
 
     async submit(userInput) {
@@ -1128,7 +1454,6 @@ data: {
           { pendingCorrection: correction, config: cfg }
         );
 
-        // Stream and keep a raw copy so abort can still parse partial output.
         this._lastRawStream = '';
         H.UIController.beginAssistantStream();
         const raw = await H.LLMClient.generateStream(messages, cfg, (tok) => {
@@ -1179,8 +1504,6 @@ data: {
           return null;
         }
         H.bus.emit(H.EVENTS.TURN_ERROR, e);
-        // Drop the pending user message and restore it to the input field so
-        // the user can hit Send again without retyping.
         let pending = null;
         if (this._history.length && this._history[this._history.length - 1].role === 'user') {
           pending = this._history.pop();
@@ -1194,7 +1517,6 @@ data: {
           H.UIController._els.input.focus();
         }
         throw e;
-
       } finally {
         this._busy = false;
         H.UIController.setBusy(false);
@@ -1238,10 +1560,15 @@ data: {
       try { await this.submit(lastUser.content); } catch (_) {}
     },
 
-    async newChat() {
-      if (this._busy) return; // ignore during active turn
-      const ok = window.confirm('Start a new chat? This clears the transcript and resets state.');
-      if (!ok) return;
+       async newChat(opts) {
+      if (this._busy) return;
+      opts = opts || {};
+
+      // Picker path: no explicit scene, not forced → open picker modal
+      if (!opts.force && !('scene' in opts)) {
+        H.UIController.openScenePicker();
+        return;
+      }
 
       this._history = [];
       H.StateManager.reset();
@@ -1251,13 +1578,27 @@ data: {
       H.UIController.endAssistantStream();
 
       const card = H.CharacterCardLoader.getActive();
-      if (card && card.firstMessage) {
+
+      // If a scene is specified, push its exchanges as real history.
+      // Otherwise fall back to the card's greeting.
+      if (opts.scene && Array.isArray(opts.scene.exchanges) && opts.scene.exchanges.length) {
+        for (const ex of opts.scene.exchanges) {
+          if (ex.user && ex.user.trim()) {
+            this._history.push({ role: 'user', content: ex.user.trim() });
+          }
+          if (ex.assistant && ex.assistant.trim()) {
+            this._history.push({ role: 'assistant', content: ex.assistant.trim() });
+          }
+        }
+      } else if (card && card.firstMessage) {
         this._history.push({ role: 'assistant', content: card.firstMessage });
       }
+
       this._persistHistory();
       H.UIController.renderChat(this._history);
       H.UIController.renderStateView(H.StateManager.get());
       H.UIController.updateStatus(H.StateManager.get());
+      H.UIController.renderPortrait();
       H.UIController._els.input.value = '';
       H.UIController._els.input.focus();
       H.DebugPanel.render({
@@ -1267,17 +1608,11 @@ data: {
       });
     },
 
-    /** Back-compat alias used by the old settings button. */
     async reset() { return this.newChat(); },
-
     getHistory() { return this._history.slice(); },
     _persistHistory() { H.storage.set(H.STORAGE.HISTORY, this._history); },
     setHistory(h) { this._history = h.slice(); this._persistHistory(); },
   };
-
-  /* =========================================================================
-   * 11. UI CONTROLLER
-   * ========================================================================= */
 
   H.UIController = {
     _els: {},
@@ -1285,7 +1620,22 @@ data: {
     _streamPending: '',
     _suppressing: false,
     _streamBubble: null,
+    _previewedCardId: null,   // which card the settings panel is showing
+    _draftPortrait: null,     // portrait held in memory for a new/unsaved card
+    _isDraftMode: false,      // true after clicking New, until Save or Load
+    _editingScene: null,      // working copy of the scene being edited
+    _editingSceneId: null,    // null when creating new, id when editing existing
+    _sceneEditorFromPicker: false,
+    _followBottom: true,
 
+    MOOD_BASE: ['neutral', 'happy', 'sad', 'angry', 'wary', 'warm'],
+    SILHOUETTE: 'data:image/svg+xml;utf8,' + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
+      '<rect width="100" height="100" fill="#1a1a1a"/>' +
+      '<circle cx="50" cy="40" r="16" fill="#333"/>' +
+      '<path d="M20 90 Q20 60 50 60 Q80 60 80 90 Z" fill="#333"/>' +
+      '</svg>'
+  ),
     init() {
       this._els = {
         chat:        document.getElementById('chat'),
@@ -1299,6 +1649,12 @@ data: {
         debugToggle: document.getElementById('debug-toggle'),
         debugPanel:  document.getElementById('debug-panel'),
         settings:    document.getElementById('settings'),
+        moodSelect:  document.getElementById('mood-select'),
+        moodClear:   document.getElementById('mood-clear'),
+        moodDelete:  document.getElementById('mood-delete'),
+        moodCustomInput:  document.getElementById('mood-custom-input'),
+        moodCustomSave:   document.getElementById('mood-custom-save'),
+        moodCustomCancel: document.getElementById('mood-custom-cancel'),
       };
 
       this._els.send.addEventListener('click', () => this._onSend());
@@ -1310,23 +1666,65 @@ data: {
       this._els.regenerate.addEventListener('click', () => H.TurnController.regenerate());
       this._els.debugToggle.addEventListener('click', () => H.DebugPanel.toggle());
 
+      this._els.regenerate.addEventListener('click', () => H.TurnController.regenerate());
+      this._els.debugToggle.addEventListener('click', () => H.DebugPanel.toggle());
+
+      // Scene picker
+      document.getElementById('scene-picker-close')
+        .addEventListener('click', () => this.closeScenePicker());
+      document.getElementById('scene-blank')
+        .addEventListener('click', () => {
+          this.closeScenePicker();
+          H.TurnController.newChat({ force: true });
+        });
+            document.getElementById('scene-new')
+        .addEventListener('click', () => {
+          this.closeScenePicker();
+          this.openSceneEditor(null, { fromPicker: true });
+        });
+
+      // Scene editor
+      document.getElementById('scene-editor-close')
+        .addEventListener('click', () => this._sceneEditorCancel());
+      document.getElementById('scene-editor-cancel')
+        .addEventListener('click', () => this._sceneEditorCancel());
+      document.getElementById('scene-editor-save')
+        .addEventListener('click', () => this._sceneEditorSave());
+      document.getElementById('scene-editor-delete')
+        .addEventListener('click', () => this._sceneEditorDelete());
+      document.getElementById('scene-editor-add')
+        .addEventListener('click', () => this._sceneEditorAddExchange());
+      document.getElementById('scene-editor-remove')
+        .addEventListener('click', () => this._sceneEditorRemoveLast());
+
+      // Mood UI
+      this._els.moodSelect.addEventListener('change', () => this._onMoodSelect());
+      this._els.moodClear.addEventListener('click', () => {
+        H.ConfigManager.set('desiredMood', '');
+        this._renderMoodBar();
+      });
+      this._els.moodDelete.addEventListener('click', () => this._onMoodDelete());
+      this._els.moodCustomSave.addEventListener('click', () => this._saveCustomMood());
+      this._els.moodCustomCancel.addEventListener('click', () => this._cancelCustomMood());
+      this._els.moodCustomInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); this._saveCustomMood(); }
+        if (e.key === 'Escape') { e.preventDefault(); this._cancelCustomMood(); }
+      });
+
+      // Portrait
       const portraitEl   = document.getElementById('portrait');
       const portraitImg  = document.getElementById('portrait-img');
       const portraitFile = document.getElementById('portrait-file');
-
       this._els.portrait     = portraitEl;
       this._els.portraitImg  = portraitImg;
       this._els.portraitFile = portraitFile;
-
       portraitEl.addEventListener('click', () => portraitFile.click());
-
       portraitFile.addEventListener('change', (e) => {
         const f = e.target.files && e.target.files[0];
         if (!f) return;
         this._setPortraitFromFile(f);
-        e.target.value = ''; // allow re-picking the same file
+        e.target.value = '';
       });
-
       this.renderPortrait();
 
       H.bus.on(H.EVENTS.TURN_START, () => this.setBusy(true));
@@ -1337,30 +1735,122 @@ data: {
         this.updateStatus(after);
       });
 
-      // Restore debug panel visibility from last session.
       const ui = H.storage.get(H.STORAGE.UI, {}) || {};
       if (ui.debugVisible) H.DebugPanel.show();
-      // Track whether the user is "following" the bottom of the chat.
-      // A scroll event is the only reliable signal of user intent — position
-      // alone misfires during the first overflow.
-      this._followBottom = true;
+
       this._els.chat.addEventListener('scroll', () => {
         const el = this._els.chat;
         this._followBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 60;
       }, { passive: true });
     },
 
+    /* ---------- Mood UI (Goal 6) ---------- */
+
+    _renderMoodBar() {
+      const sel = this._els.moodSelect;
+      if (!sel) return;
+      this._hideCustomMoodInput();
+
+      const cur = H.ConfigManager.get('desiredMood') || '';
+      const customs = H.ConfigManager.get('customMoods') || [];
+      const baseSet = new Set(this.MOOD_BASE);
+
+      sel.innerHTML = '';
+
+      const optNone = document.createElement('option');
+      optNone.value = ''; optNone.textContent = '— none —';
+      if (!cur) optNone.selected = true;
+      sel.appendChild(optNone);
+
+      for (const m of this.MOOD_BASE) {
+        const o = document.createElement('option');
+        o.value = m; o.textContent = m;
+        if (m === cur) o.selected = true;
+        sel.appendChild(o);
+      }
+
+      if (customs.length) {
+        const sep = document.createElement('option');
+        sep.disabled = true; sep.textContent = '── custom ──';
+        sel.appendChild(sep);
+        for (const m of customs) {
+          const o = document.createElement('option');
+          o.value = m; o.textContent = m;
+          if (m === cur) o.selected = true;
+          sel.appendChild(o);
+        }
+      }
+
+      const optCustom = document.createElement('option');
+      optCustom.value = '__custom__'; optCustom.textContent = '+ custom…';
+      sel.appendChild(optCustom);
+
+      this._els.moodClear.style.display = cur ? '' : 'none';
+      const isCustom = cur && !baseSet.has(cur);
+      this._els.moodDelete.style.display = isCustom ? '' : 'none';
+    },
+
+    _onMoodSelect() {
+      const v = this._els.moodSelect.value;
+      if (v === '__custom__') {
+        this._showCustomMoodInput();
+        return;
+      }
+      H.ConfigManager.set('desiredMood', v);
+      this._renderMoodBar();
+    },
+
+    _showCustomMoodInput() {
+      this._els.moodSelect.style.display = 'none';
+      this._els.moodClear.style.display = 'none';
+      this._els.moodDelete.style.display = 'none';
+      this._els.moodCustomInput.style.display = '';
+      this._els.moodCustomSave.style.display = '';
+      this._els.moodCustomCancel.style.display = '';
+      this._els.moodCustomInput.value = '';
+      try { this._els.moodCustomInput.focus(); } catch (_) {}
+    },
+
+    _hideCustomMoodInput() {
+      this._els.moodCustomInput.style.display = 'none';
+      this._els.moodCustomSave.style.display = 'none';
+      this._els.moodCustomCancel.style.display = 'none';
+      this._els.moodSelect.style.display = '';
+    },
+
+    _saveCustomMood() {
+      const raw = this._els.moodCustomInput.value;
+      const trimmed = raw ? raw.trim().toLowerCase().slice(0, 30) : '';
+      if (trimmed) {
+        const moods = H.ConfigManager.get('customMoods') || [];
+        if (moods.indexOf(trimmed) === -1 && this.MOOD_BASE.indexOf(trimmed) === -1) {
+          moods.push(trimmed);
+          H.ConfigManager.set('customMoods', moods);
+        }
+        H.ConfigManager.set('desiredMood', trimmed);
+      }
+      this._renderMoodBar();
+    },
+
+    _cancelCustomMood() { this._renderMoodBar(); },
+
+    _onMoodDelete() {
+      const cur = H.ConfigManager.get('desiredMood') || '';
+      if (!cur) return;
+      const moods = (H.ConfigManager.get('customMoods') || []).filter(m => m !== cur);
+      H.ConfigManager.set('customMoods', moods);
+      H.ConfigManager.set('desiredMood', '');
+      this._renderMoodBar();
+    },
+
+    /* ---------- Input / send ---------- */
+
     async _onSend() {
       const text = this._els.input.value;
       if (!text || !text.trim()) return;
       this._els.input.value = '';
-      this._followBottom = true;   // ← new message: resume follow mode
+      this._followBottom = true;
       try { await H.TurnController.submit(text); } catch (_) {}
-    },
-
-    _shouldAutoScroll() {
-      const el = this._els.chat;
-      return (el.scrollHeight - el.scrollTop - el.clientHeight) < 60;
     },
 
     _maybeScrollToBottom() {
@@ -1444,7 +1934,6 @@ data: {
 
     endAssistantStream() {
       if (this._streamBubble) {
-        // Flush any leftover visible tail (fixes the "last 7 chars vanish" bug).
         if (!this._suppressing && this._streamPending) {
           this._streamVisible += this._streamPending;
           this._streamPending = '';
@@ -1462,7 +1951,6 @@ data: {
       const OPEN = '[STATE]', CLOSE = '[/STATE]';
       for (const ch of token) {
         this._streamPending += ch;
-
         if (this._suppressing) {
           if (this._streamPending.endsWith(CLOSE)) {
             this._streamPending = '';
@@ -1497,11 +1985,10 @@ data: {
       this._els.send.disabled = busy;
       this._els.regenerate.disabled = busy;
       this._els.newchat.disabled = busy;
+      this._els.moodSelect.disabled = busy;
       this._els.stop.style.display = busy ? '' : 'none';
       this._els.send.style.display = busy ? 'none' : '';
-      if (!busy) {
-        try { this._els.input.focus(); } catch (_) {}
-      }
+      if (!busy) try { this._els.input.focus(); } catch (_) {}
     },
 
     showError(message) {
@@ -1517,47 +2004,50 @@ data: {
       this._els.stateView.textContent = JSON.stringify(state, null, 0);
     },
 
-      _portraitKey() {
-        const card = H.CharacterCardLoader.getActive();
-        return 'harness.portrait.' + ((card && card.name) || 'default');
-      },
+    /* ---------- Portrait (Goal 1) ---------- */
 
     renderPortrait() {
-      const key = this._portraitKey();
-      const data = H.storage.get(key, null);
+      const card = H.CharacterCardLoader.getActive();
       const el  = this._els.portrait;
       const img = this._els.portraitImg;
+      if (!card || !card.id) {
+        img.removeAttribute('src');
+        el.classList.remove('has-image');
+        return;
+      }
+      const data = H.CharacterCardLoader.getPortraitForId(card.id);
       if (data) {
         img.src = data;
         el.classList.add('has-image');
       } else {
-        img.removeAttribute('src');
-        el.classList.remove('has-image');
+        img.src = this.SILHOUETTE;
+        el.classList.add('has-image');
       }
     },
 
     _setPortraitFromFile(file) {
+      const card = H.CharacterCardLoader.getActive();
+      if (!card || !card.id) return;
       if (!file.type.startsWith('image/')) return;
       const reader = new FileReader();
       reader.onload = (ev) => {
         const img = new Image();
         img.onload = () => {
-          // Cap at 512x512 preserving aspect, then JPEG-encode.
           const MAX = 512;
           let w = img.width, h = img.height;
           const scale = Math.min(1, MAX / Math.max(w, h));
           w = Math.round(w * scale);
           h = Math.round(h * scale);
-
           const canvas = document.createElement('canvas');
           canvas.width = w; canvas.height = h;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, w, h);
-
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
           const data = canvas.toDataURL('image/jpeg', 0.85);
           try {
-            H.storage.set(this._portraitKey(), data);
+            H.CharacterCardLoader.setPortraitForId(card.id, data);
+            this._previewedCardId = card.id;
+            this._isDraftMode = false;
             this.renderPortrait();
+            this._renderSettings();
           } catch (e) {
             alert('Portrait too large to store. Try a smaller image.');
           }
@@ -1568,104 +2058,609 @@ data: {
       reader.readAsDataURL(file);
     },
 
-    /* ---- Settings panel ---- */
+    _deleteActivePortrait() {
+      const card = H.CharacterCardLoader.getActive();
+      if (!card || !card.id) return;
+      if (!confirm('Delete this portrait?')) return;
+      const ok = H.CharacterCardLoader.deletePortraitForId(card.id);
+      if (!ok) {
+        alert("This portrait is locked and can't be deleted.");
+        return;
+      }
+      this.renderPortrait();
+      this._renderSettings();
+    },
+
+    /* ---------- Settings (Goal 1 + Goal 6) ---------- */
+
+        _getPreviewPortrait() {
+      if (this._isDraftMode) return this._draftPortrait || this.SILHOUETTE;
+      const id = this._previewedCardId;
+      if (!id) return this.SILHOUETTE;
+      return H.CharacterCardLoader.getPortraitForId(id) || this.SILHOUETTE;
+    },
+
+    _getPreviewCard() {
+      if (this._isDraftMode) return null;
+      return H.CharacterCardLoader.getCardById(this._previewedCardId);
+    },
+
+    _setPreviewPortrait(file) {
+      if (!file || !file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX = 512;
+          let w = img.width, h = img.height;
+          const scale = Math.min(1, MAX / Math.max(w, h));
+          w = Math.round(w * scale);
+          h = Math.round(h * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          const data = canvas.toDataURL('image/jpeg', 0.85);
+
+          if (this._isDraftMode) {
+            this._draftPortrait = data;
+          } else if (this._previewedCardId) {
+            H.CharacterCardLoader.setPortraitForId(this._previewedCardId, data);
+            if (this._previewedCardId === H.CharacterCardLoader.getActiveId()) {
+              this.renderPortrait();
+            }
+          }
+          this._renderSettings();
+        };
+        img.onerror = () => alert('Could not read that image.');
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    },
+
+    _clearPreviewPortrait() {
+      if (this._isDraftMode) {
+        this._draftPortrait = null;
+        this._renderSettings();
+        return;
+      }
+      const id = this._previewedCardId;
+      if (!id) return;
+      const card = H.CharacterCardLoader.getCardById(id);
+      if (!card) return;
+
+      const current = H.CharacterCardLoader.getPortraitForId(id);
+
+      if (card.portraitLocked) {
+        if (!current) return;
+        if (!confirm('Reset this portrait back to the default?')) return;
+        H.storage.remove('harness.portrait.' + id);
+        H.CharacterCardLoader.loadBundledPortraitIfMissing(id).then(() => {
+          if (id === H.CharacterCardLoader.getActiveId()) this.renderPortrait();
+          this._renderSettings();
+        });
+        return;
+      }
+
+      if (!confirm('Delete this portrait?')) return;
+      H.CharacterCardLoader.deletePortraitForId(id);
+      if (id === H.CharacterCardLoader.getActiveId()) this.renderPortrait();
+      this._renderSettings();
+    },
+
+    _openPreviewPortraitPicker() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (f) this._setPreviewPortrait(f);
+      };
+      input.click();
+    },
+
+        _openPreviewPortraitPicker() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (f) this._setPreviewPortrait(f);
+      };
+      input.click();
+    },
+
+    /* ---------- Scene picker (Goal 5) ---------- */
+
+    openScenePicker() {
+      const card = H.CharacterCardLoader.getActive();
+      if (!card || !card.id) return;
+      this._renderSceneList();
+      document.getElementById('scene-picker').style.display = 'flex';
+    },
+
+    closeScenePicker() {
+      document.getElementById('scene-picker').style.display = 'none';
+    },
+
+    _renderSceneList() {
+      const card = H.CharacterCardLoader.getActive();
+      const listEl = document.getElementById('scene-list');
+      listEl.innerHTML = '';
+      if (!card || !card.id) return;
+
+      const scenes = H.SceneStore.listForCard(card.id);
+      for (const scene of scenes) {
+        const btn = document.createElement('button');
+        btn.className = 'scene-row';
+        const tok = H.SceneStore.estimateTokens(scene);
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'scene-row-name';
+        nameEl.textContent = scene.name || 'Untitled scene';
+        btn.appendChild(nameEl);
+
+        const metaEl = document.createElement('div');
+        metaEl.className = 'scene-row-meta';
+        const nEx = scene.exchanges.length;
+        metaEl.textContent = nEx + ' exchange' + (nEx === 1 ? '' : 's') +
+                            ' · ~' + tok + ' tokens' +
+                            (scene.shareable ? ' · shareable' : '');
+        btn.appendChild(metaEl);
+
+        btn.addEventListener('click', () => {
+          this.closeScenePicker();
+          H.TurnController.newChat({ force: true, scene: scene });
+        });
+
+        btn.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          this.closeScenePicker();
+          this.openSceneEditor(scene.id, { fromPicker: true });
+        });
+
+        listEl.appendChild(btn);
+      }
+    },
+
+        /* ---------- Scene editor (Goal 5, part 2) ---------- */
+
+    openSceneEditor(sceneId, opts) {
+      opts = opts || {};
+      const card = H.CharacterCardLoader.getActive();
+      if (!card || !card.id) { alert('No active character.'); return; }
+
+      this._sceneEditorFromPicker = !!opts.fromPicker;
+
+      if (sceneId) {
+        const existing = H.SceneStore.get(card.id, sceneId);
+        if (!existing) { alert('Scene not found.'); return; }
+        this._editingSceneId = sceneId;
+        this._editingScene = JSON.parse(JSON.stringify(existing));
+      } else {
+        this._editingSceneId = null;
+        this._editingScene = {
+          id: H.SceneStore.newId(),
+          name: '',
+          shareable: true,
+          exchanges: H.SceneStore.blankExchanges(),
+        };
+      }
+
+      this._renderSceneEditor();
+      document.getElementById('scene-editor').style.display = 'flex';
+    },
+
+    closeSceneEditor() {
+      document.getElementById('scene-editor').style.display = 'none';
+      const fromPicker = this._sceneEditorFromPicker;
+      this._editingScene = null;
+      this._editingSceneId = null;
+      this._sceneEditorFromPicker = false;
+      return fromPicker;
+    },
+
+    _renderSceneEditor() {
+      const s = this._editingScene;
+      if (!s) return;
+
+      document.getElementById('scene-editor-title').textContent =
+        this._editingSceneId ? 'Edit scene' : 'New scene';
+      document.getElementById('scene-editor-name').value = s.name || '';
+      document.getElementById('scene-editor-shareable').checked = !!s.shareable;
+
+      const delBtn = document.getElementById('scene-editor-delete');
+      delBtn.style.visibility = this._editingSceneId ? 'visible' : 'hidden';
+
+      const container = document.getElementById('scene-editor-exchanges');
+      container.innerHTML = '';
+
+      const card = H.CharacterCardLoader.getActive();
+      const charName = (card && card.name) || 'Character';
+      const userName = (H.ConfigManager.get('userCharacterName') || '').trim() || 'You';
+
+      s.exchanges.forEach((ex, idx) => {
+        const block = document.createElement('div');
+        block.className = 'exchange-block';
+
+        const head = document.createElement('div');
+        head.className = 'exchange-head';
+        head.textContent = 'Exchange ' + (idx + 1);
+        block.appendChild(head);
+
+        // User row
+        const userRow = document.createElement('div');
+        userRow.className = 'exchange-row';
+        const userLabel = document.createElement('div');
+        userLabel.className = 'exchange-role exchange-role-user';
+        userLabel.textContent = userName;
+        userRow.appendChild(userLabel);
+        const userArea = document.createElement('textarea');
+        userArea.value = ex.user || '';
+        userArea.maxLength = 600;
+        userArea.placeholder = 'What ' + userName + ' says or does…';
+        userArea.addEventListener('input', () => {
+          s.exchanges[idx].user = userArea.value;
+          this._updateSceneEstimate();
+        });
+        userRow.appendChild(userArea);
+        block.appendChild(userRow);
+
+        // Assistant row
+        const asstRow = document.createElement('div');
+        asstRow.className = 'exchange-row';
+        const asstLabel = document.createElement('div');
+        asstLabel.className = 'exchange-role exchange-role-assistant';
+        asstLabel.textContent = charName;
+        asstRow.appendChild(asstLabel);
+        const asstArea = document.createElement('textarea');
+        asstArea.value = ex.assistant || '';
+        asstArea.maxLength = 600;
+        asstArea.placeholder = 'What ' + charName + ' says or does…';
+        asstArea.addEventListener('input', () => {
+          s.exchanges[idx].assistant = asstArea.value;
+          this._updateSceneEstimate();
+        });
+        asstRow.appendChild(asstArea);
+        block.appendChild(asstRow);
+
+        container.appendChild(block);
+      });
+
+      this._updateSceneEstimate();
+    },
+
+    _updateSceneEstimate() {
+      const s = this._editingScene;
+      if (!s) return;
+      const tok = H.SceneStore.estimateTokens(s);
+      const el = document.getElementById('scene-editor-estimate');
+      let text = '~' + tok + ' tokens';
+      let cls = 'hint';
+      if (tok > 500) {
+        cls = 'hint scene-over-limit';
+        text += ' — too heavy for the phone';
+      } else if (tok > 250) {
+        text += ' — getting heavy for the phone';
+      } else {
+        text += ' — fits comfortably';
+      }
+      el.className = cls;
+      el.textContent = text;
+    },
+
+    _sceneEditorAddExchange() {
+      if (!this._editingScene) return;
+      if (this._editingScene.exchanges.length >= H.SceneStore.MAX_EXCHANGES) {
+        alert('Maximum ' + H.SceneStore.MAX_EXCHANGES + ' exchanges per scene.');
+        return;
+      }
+      this._editingScene.exchanges.push({ user: '', assistant: '' });
+      this._renderSceneEditor();
+    },
+
+    _sceneEditorRemoveLast() {
+      if (!this._editingScene) return;
+      if (this._editingScene.exchanges.length <= 1) {
+        alert('A scene needs at least one exchange.');
+        return;
+      }
+      this._editingScene.exchanges.pop();
+      this._renderSceneEditor();
+    },
+
+    _sceneEditorSave() {
+      const s = this._editingScene;
+      if (!s) return;
+      const card = H.CharacterCardLoader.getActive();
+      if (!card || !card.id) { alert('No active character.'); return; }
+
+      const name = (document.getElementById('scene-editor-name').value || '').trim();
+      if (!name) { alert('Please give the scene a name.'); return; }
+
+      const hasContent = s.exchanges.some(
+        ex => (ex.user || '').trim() || (ex.assistant || '').trim()
+      );
+      if (!hasContent) { alert('At least one exchange needs content.'); return; }
+
+      s.name = name.slice(0, 80);
+      s.shareable = !!document.getElementById('scene-editor-shareable').checked;
+
+      H.SceneStore.save(card.id, s);
+      const back = this.closeSceneEditor();
+      if (back) this.openScenePicker();
+    },
+
+    _sceneEditorCancel() {
+      const back = this.closeSceneEditor();
+      if (back) this.openScenePicker();
+    },
+
+    _sceneEditorDelete() {
+      if (!this._editingSceneId) return;
+      const card = H.CharacterCardLoader.getActive();
+      if (!card || !card.id) return;
+      if (!confirm('Delete this scene?')) return;
+      H.SceneStore.delete(card.id, this._editingSceneId);
+      const back = this.closeSceneEditor();
+      if (back) this.openScenePicker();
+    },
+
+    /* ---------- Settings (Goal 1 + Goal 6) ---------- */
 
     _renderSettings() {
       const el = this._els.settings;
+      const prevDetails = el.querySelector('details');
+      const wasOpen = prevDetails ? prevDetails.open : false;
       el.innerHTML = '';
-
       const details = document.createElement('details');
+      details.open = wasOpen;
       const summary = document.createElement('summary');
       summary.textContent = '⚙ Settings';
       details.appendChild(summary);
 
-      // --- Character card picker ---
-      const cardHeading = document.createElement('div');
-      cardHeading.textContent = 'Character';
-      cardHeading.className = 'hint';
-      cardHeading.style.marginTop = '10px';
-      details.appendChild(cardHeading);
+      // Default preview to active card if not set
+      if (!this._isDraftMode && !this._previewedCardId) {
+        this._previewedCardId = H.CharacterCardLoader.getActiveId();
+      }
 
-      const lib = H.CharacterCardLoader.getLibrary();
-      const active = H.CharacterCardLoader.getActive();
+      /* ======== CHARACTER SECTION ======== */
+
+      const charHead = document.createElement('div');
+      charHead.className = 'section-head';
+      charHead.textContent = 'Character';
+      details.appendChild(charHead);
+
+      const allCards = H.CharacterCardLoader.getAllCards();
+      const previewedCard = this._isDraftMode
+        ? null
+        : H.CharacterCardLoader.getCardById(this._previewedCardId);
+
       const picker = document.createElement('select');
-      const customOpt = document.createElement('option');
-      customOpt.value = '__custom__';
-      customOpt.textContent = '— Custom (edit below) —';
-      picker.appendChild(customOpt);
-      for (const entry of lib) {
+      picker.id = 'card-picker';
+      const draftOpt = document.createElement('option');
+      draftOpt.value = '__draft__';
+      draftOpt.textContent = '— New character (draft) —';
+      if (this._isDraftMode) draftOpt.selected = true;
+      picker.appendChild(draftOpt);
+
+      for (const c of allCards) {
         const o = document.createElement('option');
-        o.value = entry.id;
-        o.textContent = entry.name;
-        if (active && active.name === (entry.data.name || '')) o.selected = true;
+        o.value = c.id;
+        let label = c.name;
+        if (c.locked) label += ' ★';
+        else if (c.isCustom) label += ' ·';
+        o.textContent = label;
+        if (!this._isDraftMode && previewedCard && previewedCard.id === c.id) o.selected = true;
         picker.appendChild(o);
       }
       details.appendChild(picker);
 
+      // Portrait row
+      const portraitRow = document.createElement('div');
+      portraitRow.className = 'card-row';
+
+      const preview = document.createElement('div');
+      preview.className = 'card-preview';
+      const previewPortrait = this._getPreviewPortrait();
+      if (previewPortrait) {
+        const im = document.createElement('img');
+        im.src = previewPortrait;
+        preview.appendChild(im);
+      }
+      portraitRow.appendChild(preview);
+
+      const portraitActions = document.createElement('div');
+      portraitActions.className = 'card-actions-col';
+
+      const uploadBtn = document.createElement('button');
+      uploadBtn.textContent = 'Upload portrait';
+      uploadBtn.addEventListener('click', () => this._openPreviewPortraitPicker());
+      portraitActions.appendChild(uploadBtn);
+
+      const deletePortraitBtn = document.createElement('button');
+      deletePortraitBtn.textContent = 'Delete portrait';
+      deletePortraitBtn.className = 'danger';
+      const hasPortrait = previewPortrait && previewPortrait !== this.SILHOUETTE;
+      if (!hasPortrait) deletePortraitBtn.disabled = true;
+      deletePortraitBtn.addEventListener('click', () => this._clearPreviewPortrait());
+      portraitActions.appendChild(deletePortraitBtn);
+
+      portraitRow.appendChild(portraitActions);
+      details.appendChild(portraitRow);
+
+      // Textarea
       const cardArea = document.createElement('textarea');
-      cardArea.style.marginTop = '6px';
-      cardArea.value = active ? JSON.stringify(active._raw || {
-        name: active.name,
-        systemPrompt: active.systemPrompt,
-        firstMessage: active.firstMessage,
-      }, null, 2) : '';
+      cardArea.style.marginTop = '8px';
+      if (this._isDraftMode || !previewedCard) {
+        cardArea.value = JSON.stringify(H.CharacterCardLoader.BLANK_TEMPLATE, null, 2);
+      } else {
+        // previewedCard.data holds the actual card fields; the wrapper
+        // carries metadata like id, locked, isCustom.
+        const dataForEdit = Object.assign({}, previewedCard.data, {
+          exampleDialogue: (previewedCard.data && previewedCard.data.exampleDialogue) || '',
+          exportable: previewedCard.exportable,
+        });
+        cardArea.value = JSON.stringify(dataForEdit, null, 2);
+      }
       details.appendChild(cardArea);
 
-      picker.addEventListener('change', () => {
-        const id = picker.value;
-        if (id === '__custom__') return;
-        const entry = lib.find(e => e.id === id);
-        if (!entry) return;
-        cardArea.value = JSON.stringify(entry.data, null, 2);
-      });
+      const cardHint = document.createElement('div');
+      cardHint.className = 'hint';
+      cardHint.textContent = 'Fields: name, systemPrompt, firstMessage. Optional: exampleDialogue, exportable.';
+      details.appendChild(cardHint);
 
+      // Actions
       const actions = document.createElement('div');
       actions.id = 'card-actions';
-      const btn = (label, fn) => {
+      const btn = (label, fn, cls) => {
         const b = document.createElement('button');
         b.textContent = label;
+        if (cls) b.className = cls;
         b.addEventListener('click', fn);
         return b;
       };
 
-      actions.appendChild(btn('Load card', () => {
-        try {
-          const card = H.CharacterCardLoader.load(cardArea.value);
-          H.CharacterCardLoader.setActive(card);
-          const hist = H.TurnController.getHistory();
-          // Only reseed the greeting if the transcript is empty or a lone greeting.
-          if (hist.length <= 1) {
-            H.TurnController.setHistory(card.firstMessage
-              ? [{ role: 'assistant', content: card.firstMessage }] : []);
-            H.UIController.renderChat(H.TurnController.getHistory());
-          }
-          H.Logger.log('info', 'UIController', 'card_loaded', { name: card.name });
-        } catch (e) { alert('Card load failed: ' + e.message); }
+      // New — enter draft mode
+      actions.appendChild(btn('New', () => {
+        this._isDraftMode = true;
+        this._draftPortrait = null;
+        this._renderSettings();
       }));
 
-      actions.appendChild(btn('Save to library', () => {
+      // Load — parse and activate
+      actions.appendChild(btn('Load', () => {
         try {
-          const card = H.CharacterCardLoader.load(cardArea.value);
-          H.CharacterCardLoader.saveCustomCard(card);
-          H.UIController._renderSettings();
-          alert('Saved: ' + card.name);
+          const parsed = JSON.parse(cardArea.value);
+          const card = H.CharacterCardLoader.load(parsed);
+          const nameMatch = allCards.find(c => c.name === card.name);
+
+          if (nameMatch) {
+            H.CharacterCardLoader.setActiveById(nameMatch.id);
+          } else {
+            const entry = H.CharacterCardLoader.saveCustomCard(parsed, null);
+            if (this._draftPortrait) {
+              H.CharacterCardLoader.setPortraitForId(entry.id, this._draftPortrait);
+            }
+            H.CharacterCardLoader.setActiveById(entry.id);
+          }
+
+          this._isDraftMode = false;
+          this._draftPortrait = null;
+          this._previewedCardId = H.CharacterCardLoader.getActiveId();
+          H.UIController.renderPortrait();
+          H.UIController.renderChat(H.TurnController.getHistory());
+          H.TurnController.newChat({ force: true });
+        } catch (e) { alert('Load failed: ' + e.message); }
+      }));
+
+      // Save
+      actions.appendChild(btn('Save', () => {
+        try {
+          const parsed = JSON.parse(cardArea.value);
+          let targetId = null;
+          let displayName = parsed.name;
+
+          if (this._isDraftMode) {
+            const entry = H.CharacterCardLoader.saveCustomCard(parsed, null);
+            if (this._draftPortrait) {
+              H.CharacterCardLoader.setPortraitForId(entry.id, this._draftPortrait);
+            }
+            targetId = entry.id;
+            this._isDraftMode = false;
+            this._draftPortrait = null;
+          } else if (previewedCard && previewedCard.isCustom) {
+            const entry = H.CharacterCardLoader.saveCustomCard(parsed, previewedCard.id);
+            targetId = entry.id;
+          } else if (previewedCard && previewedCard.locked) {
+            parsed.name = (parsed.name || 'Unnamed') + ' (copy)';
+            const entry = H.CharacterCardLoader.saveCustomCard(parsed, null);
+            targetId = entry.id;
+            displayName = parsed.name;
+          } else {
+            alert('Nothing to save.');
+            return;
+          }
+
+          if (H.CharacterCardLoader.getActiveId() === targetId) {
+            H.CharacterCardLoader.setActiveById(targetId);
+          }
+          this._previewedCardId = targetId;
+          this._renderSettings();
+          if (H.CharacterCardLoader.getActiveId() === targetId) {
+            this.renderPortrait();
+          }
+          alert('Saved: ' + displayName);
         } catch (e) { alert('Save failed: ' + e.message); }
       }));
 
-      actions.appendChild(btn('Export all', () => H.ExportManager.exportToFile()));
-      actions.appendChild(btn('Import all', () => H.ExportManager.importFromFile().catch(e => alert('Import failed: ' + e.message))));
+      // Delete
+      const delBtn = btn('Delete', () => {
+        if (!previewedCard) return;
+        if (previewedCard.locked) return;
+        if (!confirm('Delete "' + previewedCard.name + '"?\nThis also removes its portrait. Cannot be undone.')) return;
+        const wasActive = H.CharacterCardLoader.getActiveId() === previewedCard.id;
+        const ok = H.CharacterCardLoader.deleteCustomCard(previewedCard.id);
+        if (!ok) { alert("Can't delete this card."); return; }
+        this._previewedCardId = H.CharacterCardLoader.getActiveId();
+        this._renderSettings();
+        if (wasActive) {
+          this.renderPortrait();
+          H.TurnController.newChat({ force: true });
+        }
+      }, 'danger');
+      if (!previewedCard || previewedCard.locked) delBtn.disabled = true;
+      actions.appendChild(delBtn);
 
       details.appendChild(actions);
 
-      // --- Config grid ---
+      // Export / Import
+      const fileActions = document.createElement('div');
+      fileActions.id = 'card-actions';
+      fileActions.style.marginTop = '6px';
+
+      fileActions.appendChild(btn('Export this', () => {
+        if (!previewedCard) { alert('No card selected to export.'); return; }
+        H.ExportManager.exportSingleCard(previewedCard.id);
+      }));
+
+      fileActions.appendChild(btn('Export all', () => H.ExportManager.exportToFile()));
+
+      fileActions.appendChild(btn('Import', () => {
+        H.ExportManager.importFromFile()
+          .then(() => { this._previewedCardId = H.CharacterCardLoader.getActiveId(); })
+          .catch(e => alert('Import failed: ' + e.message));
+      }));
+
+      details.appendChild(fileActions);
+
+      // Picker change → update preview
+      picker.addEventListener('change', () => {
+        const id = picker.value;
+        if (id === '__draft__') {
+          this._isDraftMode = true;
+          this._draftPortrait = null;
+          this._renderSettings();
+          return;
+        }
+        this._isDraftMode = false;
+        this._previewedCardId = id;
+        this._renderSettings();
+      });
+
+      /* ======== CONFIG GRID ======== */
+
+      const cfgHead = document.createElement('div');
+      cfgHead.className = 'section-head';
+      cfgHead.textContent = 'Generation';
+      details.appendChild(cfgHead);
+
       const grid = document.createElement('div');
       grid.className = 'grid';
-      grid.style.marginTop = '14px';
 
       const cfg = H.ConfigManager.getAll();
       const fields = [
-      ['Backend',          'backend',             'select', ['mock', 'native', 'openai']],
-      ['Chat template',    'chatTemplate',        'select', ['llama3', 'chatml', 'plain']],
+        ['Backend',          'backend',             'select', ['mock', 'native', 'openai']],
+        ['Chat template',    'chatTemplate',        'select', ['llama3', 'chatml', 'plain']],
         ['Endpoint',         'endpoint',            'text',   null],
         ['Model',            'model',               'text',   null],
         ['Mock scenario',    'mockScenario',        'select', Object.keys(H.LLMClient.MOCK_RESPONSES)],
@@ -1675,6 +2670,7 @@ data: {
         ['Verbatim turns',   'verbatimTurns',       'number', { step: 1, min: 0, max: 20 }],
         ['Context limit',    'contextLimit',        'number', { step: 100, min: 400, max: 8192 }],
         ['Merge sys msgs',   'mergeSystemMessages', 'checkbox', null],
+        ['Name prefix',      'namePosePrefix',      'checkbox', null],
         ['Loop check',       'loopCheckEnabled',    'checkbox', null],
         ['Compaction',       'compactionEnabled',   'checkbox', null],
       ];
@@ -1683,7 +2679,6 @@ data: {
         const lab = document.createElement('label');
         lab.textContent = label;
         grid.appendChild(lab);
-
         let inp;
         if (type === 'select') {
           inp = document.createElement('select');
@@ -1707,7 +2702,6 @@ data: {
           }
           inp.value = cfg[key];
         }
-
         inp.addEventListener('change', () => {
           let v;
           if (type === 'checkbox') v = inp.checked;
@@ -1715,7 +2709,6 @@ data: {
           else v = inp.value;
           H.ConfigManager.set(key, v);
         });
-
         grid.appendChild(inp);
       }
 
@@ -1724,23 +2717,16 @@ data: {
     },
   };
 
-  /* =========================================================================
-   * 12. DEBUG PANEL
-   * ========================================================================= */
-
   H.DebugPanel = {
     _els: {},
     _last: null,
     _visible: false,
-
     init() { this._els.panel = document.getElementById('debug-panel'); },
-
     render(payload) {
       this._last = payload;
       if (!this._visible) return;
       this._paint();
     },
-
     _paint() {
       const el = this._els.panel;
       if (!el) return;
@@ -1749,6 +2735,7 @@ data: {
       const lines = [];
       lines.push('=== TURN DEBUG ===');
       lines.push('tokens: ' + d.totalTokens + ' / cap ' + d.capTokens);
+      if (d.namePrefix) lines.push('name prefix: "' + d.namePrefix + ' "');
       lines.push('');
       lines.push('Sections:');
       for (const s of d.sections) {
@@ -1773,7 +2760,6 @@ data: {
       }
       el.textContent = lines.join('\n');
     },
-
     show() {
       this._visible = true;
       this._els.panel.style.display = 'block';
@@ -1781,69 +2767,184 @@ data: {
       const ui = H.storage.get(H.STORAGE.UI, {}) || {};
       ui.debugVisible = true; H.storage.set(H.STORAGE.UI, ui);
     },
-
     hide() {
       this._visible = false;
       this._els.panel.style.display = 'none';
       const ui = H.storage.get(H.STORAGE.UI, {}) || {};
       ui.debugVisible = false; H.storage.set(H.STORAGE.UI, ui);
     },
-
     toggle() { this._visible ? this.hide() : this.show(); },
   };
 
-  /* =========================================================================
-   * 13. EXPORT MANAGER
-   * ========================================================================= */
-
   H.ExportManager = {
-    FORMAT_VERSION: 1,
+    FORMAT_VERSION: 2,
 
+    /* Export everything exportable (cards, current state, history, portraits, scenes) */
     export() {
+      const cards = [];
+      for (const c of H.CharacterCardLoader.getAllCards()) {
+        if (!c.exportable) continue;
+        const portrait = H.CharacterCardLoader.getPortraitForId(c.id);
+        const scenes = H.SceneStore.listForCard(c.id).filter(s => s.shareable);
+        cards.push({
+          id: c.id,
+          name: c.name,
+          data: c.data,
+          portrait: portrait || null,
+          scenes: scenes,
+        });
+      }
+
+      // Include current active card even if it's a built-in (for context)
+      const active = H.CharacterCardLoader.getActive();
+      const activeId = H.CharacterCardLoader.getActiveId();
+
+      // Scene backup for the active card. Included regardless of the card's
+      // own exportable flag, because scenes are user-authored content, not
+      // part of the shipped character.
+      const activeScenes = activeId
+        ? H.SceneStore.listForCard(activeId).filter(s => s.shareable)
+        : [];
+
       return {
         formatVersion: this.FORMAT_VERSION,
+        kind: 'bundle',
         exportedAt: new Date().toISOString(),
         config: H.ConfigManager.getAll(),
         state: H.StateManager.get(),
-        card: H.CharacterCardLoader.getActive(),
+        activeCardId: activeId,
+        activeCard: active ? { name: active.name, data: active._raw } : null,
+        activeScenes: activeScenes,
+        cards,
         history: H.TurnController.getHistory(),
       };
     },
 
-    import(blob) {
-      if (!blob || typeof blob !== 'object') throw new HarnessError('IMPORT_INVALID', 'not an object');
-      if (blob.formatVersion !== this.FORMAT_VERSION) {
-        throw new HarnessError('IMPORT_INVALID', 'format version mismatch');
-      }
-      if (blob.config) {
-        Object.assign(H.ConfigManager._config, blob.config);
-        H.ConfigManager.save();
-        H.bus.emit(H.EVENTS.CONFIG_CHANGED, { imported: true });
-      }
-      if (blob.state) H.StateManager.applySnapshot(blob.state);
-      if (blob.card) {
-        try { H.CharacterCardLoader.setActive(H.CharacterCardLoader.load(blob.card._raw || blob.card)); }
-        catch (e) { H.Logger.log('warn', 'ExportManager', 'card_import_failed', e.message); }
-      }
-      if (Array.isArray(blob.history)) H.TurnController.setHistory(blob.history);
-
-      H.UIController.renderChat(H.TurnController.getHistory());
-      H.UIController.renderStateView(H.StateManager.get());
-      H.UIController.updateStatus(H.StateManager.get());
-      H.UIController._renderSettings();
+    /* Export a single card + its portrait + its shareable scenes + current chat state */
+    exportSingleCard(cardId) {
+      const card = H.CharacterCardLoader.getCardById(cardId);
+      if (!card) throw new HarnessError('EXPORT_INVALID', 'Card not found');
+      const portrait = H.CharacterCardLoader.getPortraitForId(cardId);
+      const scenes = H.SceneStore.listForCard(cardId).filter(s => s.shareable);
+      const payload = {
+        formatVersion: this.FORMAT_VERSION,
+        kind: 'character',
+        exportedAt: new Date().toISOString(),
+        card: { id: card.id, name: card.name, data: card.data },
+        portrait: portrait || null,
+        scenes: scenes,
+      };
+      this._download(payload, 'character-' + (card.name || 'unnamed').replace(/\s+/g,'-') + '.json');
     },
 
-    exportToFile() {
-      const data = JSON.stringify(this.export(), null, 2);
+    /**
+     * Restore a list of scenes into the SceneStore under the given card ID.
+     * Overwrites any scene with a matching ID (so re-imports update cleanly).
+     * Returns the number of scenes imported.
+     */
+    _importScenesForCard(cardId, scenes) {
+      if (!Array.isArray(scenes)) return 0;
+      let count = 0;
+      for (const s of scenes) {
+        if (!s || !s.id || !Array.isArray(s.exchanges)) continue;
+        const cleaned = {
+          id: String(s.id),
+          name: String(s.name || 'Imported scene').slice(0, 80),
+          shareable: s.shareable !== false,
+          exchanges: s.exchanges
+            .slice(0, H.SceneStore.MAX_EXCHANGES)
+            .map(ex => ({
+              user:      String((ex && ex.user)      || '').slice(0, 600),
+              assistant: String((ex && ex.assistant) || '').slice(0, 600),
+            })),
+        };
+        H.SceneStore.save(cardId, cleaned);
+        count++;
+      }
+      return count;
+    },
+
+    _download(payload, filename) {
+      const data = JSON.stringify(payload, null, 2);
       const blob = new Blob([data], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'harness-export-' + Date.now() + '.json';
+      a.download = filename || ('harness-export-' + Date.now() + '.json');
       document.body.appendChild(a);
-      a.click();
+            a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
+
+    import(blob) {
+      if (!blob || typeof blob !== 'object')
+        throw new HarnessError('IMPORT_INVALID', 'not an object');
+      if (blob.formatVersion !== this.FORMAT_VERSION)
+        throw new HarnessError('IMPORT_INVALID', 'format version mismatch');
+
+      let sceneCount = 0;
+
+      if (blob.kind === 'bundle') {
+        if (blob.config) {
+          Object.assign(H.ConfigManager._config, blob.config);
+          H.ConfigManager.save();
+          H.bus.emit(H.EVENTS.CONFIG_CHANGED, { imported: true });
+        }
+        if (blob.state) H.StateManager.applySnapshot(blob.state);
+        const customs = H.storage.get(H.STORAGE.CARDS, []) || [];
+        if (Array.isArray(blob.cards)) {
+          for (const c of blob.cards) {
+            if (c.id === 'nisa') continue;
+            const idx = customs.findIndex(x => x.id === c.id);
+            const entry = { id: c.id, name: c.name || 'Imported', data: c.data };
+            if (idx !== -1) customs[idx] = entry; else customs.push(entry);
+            if (c.portrait) H.CharacterCardLoader.setPortraitForId(c.id, c.portrait);
+            if (Array.isArray(c.scenes)) {
+              sceneCount += this._importScenesForCard(c.id, c.scenes);
+            }
+          }
+          H.storage.set(H.STORAGE.CARDS, customs);
+        }
+        if (blob.activeCardId && H.CharacterCardLoader.getCardById(blob.activeCardId))
+          H.CharacterCardLoader.setActiveById(blob.activeCardId);
+        if (Array.isArray(blob.history)) H.TurnController.setHistory(blob.history);
+        // Restore active-card scenes (works for built-in cards like Nisa,
+        // whose card data isn't part of the bundle).
+        if (blob.activeCardId && Array.isArray(blob.activeScenes)) {
+          sceneCount += this._importScenesForCard(blob.activeCardId, blob.activeScenes);
+        }
+      } else if (blob.kind === 'character') {
+        if (!blob.card || !blob.card.id)
+          throw new HarnessError('IMPORT_INVALID', 'character payload missing card');
+        const customs = H.storage.get(H.STORAGE.CARDS, []) || [];
+        const idx = customs.findIndex(x => x.id === blob.card.id);
+        const entry = { id: blob.card.id, name: blob.card.name || 'Imported', data: blob.card.data };
+        if (idx !== -1) customs[idx] = entry; else customs.push(entry);
+        H.storage.set(H.STORAGE.CARDS, customs);
+        if (blob.portrait) H.CharacterCardLoader.setPortraitForId(blob.card.id, blob.portrait);
+        if (Array.isArray(blob.scenes)) {
+          sceneCount += this._importScenesForCard(blob.card.id, blob.scenes);
+        }
+      } else {
+        throw new HarnessError('IMPORT_INVALID', 'unknown kind: ' + blob.kind);
+      }
+
+      H.UIController.renderChat(H.TurnController.getHistory());
+      H.UIController.renderStateView(H.StateManager.get());
+      H.UIController.updateStatus(H.StateManager.get());
+      H.UIController.renderPortrait();
+      H.UIController._renderSettings();
+      H.UIController._renderMoodBar();
+
+      if (sceneCount > 0) {
+        setTimeout(() => alert('Imported ' + sceneCount + ' scene' +
+          (sceneCount === 1 ? '' : 's') + '.'), 100);
+      }
+    },
+
+    exportToFile() {
+      this._download(this.export(), 'harness-export-' + Date.now() + '.json');
     },
 
     async importFromFile() {
@@ -1870,13 +2971,8 @@ data: {
     },
   };
 
-  /* =========================================================================
-   * BOOTSTRAP
-   * ========================================================================= */
-
   document.addEventListener('DOMContentLoaded', () => {
     H.TurnController.init().catch(e => {
-      // eslint-disable-next-line no-console
       console.error('Bootstrap failed', e);
       alert('Bootstrap failed: ' + (e && e.message ? e.message : e));
     });
