@@ -26,7 +26,18 @@ class MainActivity : Activity() {
         webView.settings.domStorageEnabled = true
         webView.settings.allowFileAccess = true
         webView.settings.allowContentAccess = true
-
+        webView.webViewClient = object : android.webkit.WebViewClient() {
+            override fun onRenderProcessGone(
+                view: android.webkit.WebView?,
+                detail: android.webkit.RenderProcessGoneDetail?
+            ): Boolean {
+                android.util.Log.e("Harness", "WebView renderer died. Recovering...")
+                view?.postDelayed({
+                    view?.loadUrl("file:///android_asset/harness.html")
+                }, 300)
+                return true // Prevents Android from killing the app process
+            }
+        }
         webView.webChromeClient = object : WebChromeClient() {
             override fun onShowFileChooser(
                 webView: WebView?,
